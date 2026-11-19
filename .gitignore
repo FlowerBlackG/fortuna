@@ -1,0 +1,9 @@
+/build/
+/target/
+/venv/
+
+/user-data/
+**/node_modules/
+**/__pycache__/
+/web/dist/
+*.tsbuildinfo
