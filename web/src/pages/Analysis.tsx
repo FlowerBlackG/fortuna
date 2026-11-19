@@ -88,7 +88,7 @@ export function AnalysisPage() {
           "Missing asset type",
         type: "line",
         stack: "assets",
-        stackStrategy: "all",
+        stackStrategy: "samesign",
         areaStyle: { opacity: 0.6 },
         ...(metadata.asset_types.some(
           (item) => item.asset_type_id === id && /^[0-9A-F]{6}$/.test(item.color),
