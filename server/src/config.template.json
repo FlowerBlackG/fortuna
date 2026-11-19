@@ -1,0 +1,13 @@
+{
+    "database": {
+        "db_file": "data.db"
+    },
+    "logging": null,
+    "web": {
+        "user": {
+            "session": {
+                "fortuna_token_expire_time_seconds": 86400
+            }
+        }
+    }
+}

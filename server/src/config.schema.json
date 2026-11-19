@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fortuna server configuration",
+  "type": "object",
+  "required": ["database", "web"],
+  "properties": {
+    "database": {
+      "type": "object",
+      "required": ["db_file"],
+      "properties": { "db_file": { "type": "string", "pattern": "\\S", "format": "path" } }
+    },
+    "logging": {
+      "default": null,
+      "description": "Null logs to stderr. File paths are relative to this config file.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["file"],
+          "properties": { "file": { "type": "string", "pattern": "\\S", "format": "path" } },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "web": {
+      "type": "object",
+      "required": ["user"],
+      "properties": {
+        "user": {
+          "type": "object",
+          "required": ["session"],
+          "properties": {
+            "session": {
+              "type": "object",
+              "required": ["fortuna_token_expire_time_seconds"],
+              "properties": {
+                "fortuna_token_expire_time_seconds": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
