@@ -387,7 +387,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
   return (
     <Card className="settings-section">
       <div className="toolbar">
-        <Button disabled={loading} onClick={() => open()}>
+        <Button shape="round" disabled={loading} onClick={() => open()}>
           Add{" "}
           {resource === "asset-types"
             ? "asset type"
@@ -396,6 +396,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
               : "institution"}
         </Button>
         <Button
+          shape="round"
           variant="outline"
           icon={<RefreshIcon />}
           aria-label="Refresh"
@@ -529,21 +530,37 @@ function AccountSettings() {
           />
         </Form.FormItem>
         <Space breakLine className="settings-section">
-          <Button type="submit" loading={saving}>
+          <Button type="submit" loading={saving} shape="round">
             Save account
           </Button>
           <Popconfirm
             content="Permanently delete your account and all reports, records, and settings? Enter your current password above first."
-            onConfirm={() => {
-              void request("DELETE", "/account", { password })
-                .then(() => setToken(""))
-                .catch(showError);
-            }}
+            confirmBtn={
+              <Button
+                shape="round"
+                theme="danger"
+                content="Delete"
+                size="small"
+                onClick={() => {
+                  void request("DELETE", "/account", { password })
+                    .then(() => setToken(""))
+                    .catch(showError);
+                }}
+              />
+            }
+            cancelBtn={
+              <Button
+                shape="round"
+                size="small"
+                content="Cancel"
+                theme="default"
+              />
+            }
           >
             <Button
               theme="danger"
-              variant="outline"
-              icon={<DeleteIcon />}
+              shape="round"
+              content="Delete account"
               aria-label="Delete account"
               title="Delete account"
             />

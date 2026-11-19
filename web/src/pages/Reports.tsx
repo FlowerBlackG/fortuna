@@ -141,7 +141,7 @@ export function ReportsPage() {
     <>
       <div className="page-heading">
         <h1>Reports</h1>
-        <Button loading={creating} onClick={() => action(create)}>
+        <Button loading={creating} shape="round" onClick={() => action(create)}>
           Create report
         </Button>
       </div>
@@ -384,8 +384,9 @@ function ReportDetail({ reportId }: { reportId: string }) {
           <span className="muted">
             {visible.length} of {records.length} records
           </span>
-          {editable && <Button onClick={() => open()}>Add record</Button>}
+          {editable && <Button shape="round" onClick={() => open()}>Add record</Button>}
           <Button
+            shape="round"
             variant="outline"
             icon={<RefreshIcon />}
             aria-label="Refresh"

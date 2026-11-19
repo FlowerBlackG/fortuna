@@ -127,7 +127,7 @@ export function ReportExchangeRates({
         {error && editing === undefined && <Alert theme="error" message={error} />}
         {editable && (
           <div className="toolbar">
-            <Button disabled={busy} onClick={() => open()}>
+            <Button shape="round" disabled={busy} onClick={() => open()}>
               Add exchange rate
             </Button>
           </div>
