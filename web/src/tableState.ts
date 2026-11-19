@@ -2,8 +2,12 @@
 import { useState } from "react";
 import type { PrimaryTableCol, TableRowData, TableSort } from "tdesign-react";
 
-export function useTableSort<T extends TableRowData>(data: T[], columns: PrimaryTableCol<T>[]) {
-  const [sort, setSort] = useState<TableSort>([]);
+export function useTableSort<T extends TableRowData>(
+  data: T[],
+  columns: PrimaryTableCol<T>[],
+  initial: TableSort = [],
+) {
+  const [sort, setSort] = useState<TableSort>(initial);
   const sorts = Array.isArray(sort) ? sort : sort ? [sort] : [];
   const sorted = sorts.length
     ? [...data].sort((left, right) => {
