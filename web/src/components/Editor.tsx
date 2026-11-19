@@ -4,16 +4,24 @@ import { Dialog, Form } from "tdesign-react";
 
 export function EditorField({
   children,
+  warning,
+  help,
   ...props
 }: {
   label: string;
   children: ReactNode;
   help?: string;
+  warning?: string | false;
   className?: string;
 }) {
   // FormItem otherwise replaces its direct input's controlled value with its own form state.
   return (
-    <Form.FormItem {...props}>
+    <Form.FormItem
+      {...props}
+      status={warning ? "warning" : undefined}
+      tips={warning || undefined}
+      help={warning ? undefined : help}
+    >
       <>{children}</>
     </Form.FormItem>
   );
@@ -37,6 +45,8 @@ export function EditorDialog({
   return (
     <Dialog
       visible
+      className="editor-dialog"
+      placement="center"
       width={720}
       header={title}
       confirmBtn={{ content: saveLabel, loading: saving }}

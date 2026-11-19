@@ -13,7 +13,8 @@ import {
   Space,
   Table,
 } from "tdesign-react";
-import { DeleteIcon } from "tdesign-icons-react";
+import { DeleteIcon, EditIcon } from "tdesign-icons-react";
+import { EditorField } from "./Editor";
 import { request } from "../api";
 import { selectString } from "../helpers";
 import { useMetadata } from "../metadata";
@@ -40,6 +41,8 @@ export function ReportExchangeRates({
   const [denominator, setDenominator] = useState("");
   const [rate, setRate] = useState<number | undefined>(1);
   const [error, setError] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const invalidRate = rate === undefined || !Number.isFinite(rate) || rate <= 0;
   const submitting = useRef(false);
   const endpoint = `/reports/${reportId}/exchange-rates`;
   const options = metadata.currencies.map((item) => ({
@@ -54,23 +57,17 @@ export function ReportExchangeRates({
     setDenominator(row?.denominator_currency_id || "");
     setRate(row?.exchange_rate ?? 1);
     setError("");
+    setAttempted(false);
   }
   async function save() {
     if (submitting.current) return;
-    if (
-      !numerator ||
-      !denominator ||
-      numerator === denominator ||
-      !rate ||
-      !Number.isFinite(rate) ||
-      rate <= 0
-    ) {
-      setError("Choose different currencies and a positive rate");
+    setError("");
+    if (!numerator || !denominator || numerator === denominator || invalidRate) {
+      setAttempted(true);
       return;
     }
     submitting.current = true;
     setBusy(true);
-    setError("");
     try {
       const saved = await request<ExchangeRate>("PUT", endpoint, {
         numerator_currency_id: numerator,
@@ -155,9 +152,14 @@ export function ReportExchangeRates({
                     width: 160,
                     cell: ({ row }: { row: ExchangeRate }) => (
                       <Space>
-                        <Button variant="text" disabled={busy} onClick={() => open(row)}>
-                          Edit
-                        </Button>
+                        <Button
+                          variant="text"
+                          icon={<EditIcon />}
+                          aria-label="Edit"
+                          title="Edit"
+                          disabled={busy}
+                          onClick={() => open(row)}
+                        />
                         <Popconfirm
                           content="Delete this rate from this report?"
                           onConfirm={() => void remove(row)}
@@ -181,6 +183,8 @@ export function ReportExchangeRates({
         {editing !== undefined && (
           <Dialog
             visible
+            className="editor-dialog"
+            placement="center"
             header="Report exchange rate"
             onClose={() => {
               if (!busy) setEditing(undefined);
@@ -191,30 +195,44 @@ export function ReportExchangeRates({
           >
             {error && <Alert theme="error" message={error} />}
             <Form labelAlign="top">
-              <Form.FormItem label="Numerator currency">
+              <EditorField
+                label="Numerator currency"
+                warning={attempted && !numerator && "Choose a currency"}
+              >
                 <Select
                   value={numerator}
                   options={options}
                   disabled={!!editing || busy}
                   onChange={(value) => setNumerator(selectString(value))}
                 />
-              </Form.FormItem>
-              <Form.FormItem label="Denominator currency">
+              </EditorField>
+              <EditorField
+                label="Denominator currency"
+                warning={
+                  attempted &&
+                  (!denominator
+                    ? "Choose a currency"
+                    : numerator === denominator && "Choose a different currency")
+                }
+              >
                 <Select
                   value={denominator}
                   options={options}
                   disabled={!!editing || busy}
                   onChange={(value) => setDenominator(selectString(value))}
                 />
-              </Form.FormItem>
-              <Form.FormItem label="Exchange rate">
+              </EditorField>
+              <EditorField
+                label="Exchange rate"
+                warning={attempted && invalidRate && "Enter a positive rate"}
+              >
                 <InputNumber
-                  value={rate}
+                  value={rate ?? ""}
                   disabled={busy}
                   decimalPlaces={10}
                   onChange={(value) => setRate(typeof value === "number" ? value : undefined)}
                 />
-              </Form.FormItem>
+              </EditorField>
               {numerator && denominator && (
                 <p>
                   1 {name(numerator)} = {rate ?? "?"} {name(denominator)}

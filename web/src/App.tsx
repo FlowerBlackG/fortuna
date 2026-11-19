@@ -7,6 +7,8 @@ import {
   ChartLineIcon,
   FileIcon,
   LogoutIcon,
+  MenuFoldIcon,
+  MenuUnfoldIcon,
   ServerIcon,
   SettingIcon,
   WalletIcon,
@@ -25,90 +27,117 @@ const AnalysisPage = lazy(() =>
   import("./pages/Analysis").then((module) => ({ default: module.AnalysisPage })),
 );
 
-function Workspace({ serverVersion }: { serverVersion: string }) {
+function WorkspaceMenu() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { error, refresh } = useMetadata();
+  const [narrow] = useState(() => window.matchMedia("(max-width: 700px)"));
+  const [collapsed, setCollapsed] = useState(narrow.matches);
+  useEffect(() => {
+    const resize = () => setCollapsed(narrow.matches);
+    narrow.addEventListener("change", resize);
+    return () => narrow.removeEventListener("change", resize);
+  }, [narrow]);
+  const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
   return (
-    <Layout className="app-layout">
-      <Layout.Header className="app-header">
-        <Space align="center">
-          <WalletIcon size="26" />
-          <strong className="brand">Fortuna</strong>
-          <span className="muted desktop-label">Personal asset settlement</span>
-        </Space>
-        <Space>
-          <Button
-            variant="text"
-            icon={<ServerIcon />}
-            aria-label="Server"
-            title="Server"
-            onClick={() => navigate("/server")}
-          />
-          <Button
-            variant="text"
-            icon={<LogoutIcon />}
-            aria-label="Log out"
-            title="Log out"
-            onClick={() =>
-              action(async () => {
-                await request("POST", "/logout");
-                setToken("");
-              })
-            }
-          />
-        </Space>
-      </Layout.Header>
-      <Menu.HeadMenu
-        theme="light"
+    <nav className="app-sidebar" aria-label="Workspace">
+      <Menu
+        width={["192px", "64px"]}
+        collapsed={collapsed}
         value={location.pathname.split("/")[1] || "reports"}
-        onChange={(value) => navigate(`/${value}`)}
+        logo={
+          <Space align="center">
+            <WalletIcon size="26" />
+            {!collapsed && <strong className="brand">Fortuna</strong>}
+          </Space>
+        }
+        operations={
+          <Space direction={collapsed ? "vertical" : "horizontal"} size="small">
+            <Button
+              variant="text"
+              icon={collapsed ? <MenuUnfoldIcon /> : <MenuFoldIcon />}
+              aria-expanded={!collapsed}
+              aria-label={toggleLabel}
+              title={toggleLabel}
+              onClick={() => setCollapsed(!collapsed)}
+            />
+            <Button
+              variant="text"
+              icon={<ServerIcon />}
+              aria-label="Server"
+              title="Server"
+              onClick={() => navigate("/server")}
+            />
+            <Button
+              variant="text"
+              icon={<LogoutIcon />}
+              aria-label="Log out"
+              title="Log out"
+              onClick={() =>
+                action(async () => {
+                  await request("POST", "/logout");
+                  setToken("");
+                })
+              }
+            />
+          </Space>
+        }
       >
-        <Menu.MenuItem value="reports" icon={<FileIcon />}>
+        <Menu.MenuItem value="reports" href="#/reports" icon={<FileIcon />}>
           Reports
         </Menu.MenuItem>
-        <Menu.MenuItem value="analysis" icon={<ChartLineIcon />}>
+        <Menu.MenuItem value="analysis" href="#/analysis" icon={<ChartLineIcon />}>
           Analysis
         </Menu.MenuItem>
-        <Menu.MenuItem value="settings" icon={<SettingIcon />}>
+        <Menu.MenuItem value="settings" href="#/settings" icon={<SettingIcon />}>
           Settings
         </Menu.MenuItem>
-      </Menu.HeadMenu>
-      <Layout.Content className="page">
-        {error && (
-          <Alert
-            theme="error"
-            message={error}
-            operation={
-              <Button
-                variant="text"
-                onClick={() => {
-                  void refresh().catch(() => {});
-                }}
-              >
-                Retry metadata
-              </Button>
-            }
-          />
-        )}
-        <Routes>
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/reports/:reportId" element={<ReportPage />} />
-          <Route
-            path="/analysis"
-            element={
-              <Suspense fallback={<Loading text="Loading analysis…" />}>
-                <AnalysisPage />
-              </Suspense>
-            }
-          />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/reports" replace />} />
-        </Routes>
-      </Layout.Content>
-      <Layout.Footer className="app-footer">
-        Fortuna Web {Version.tag} · Server {serverVersion || "—"}
-      </Layout.Footer>
+      </Menu>
+    </nav>
+  );
+}
+
+function Workspace({ serverVersion }: { serverVersion: string }) {
+  const { error, refresh } = useMetadata();
+  return (
+    <Layout direction="horizontal" className="app-layout">
+      <WorkspaceMenu />
+      <Layout className="workspace-content">
+        <Layout.Content className="page">
+          {error && (
+            <Alert
+              theme="error"
+              message={error}
+              operation={
+                <Button
+                  variant="text"
+                  onClick={() => {
+                    void refresh().catch(() => {});
+                  }}
+                >
+                  Retry metadata
+                </Button>
+              }
+            />
+          )}
+          <Routes>
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/reports/:reportId" element={<ReportPage />} />
+            <Route
+              path="/analysis"
+              element={
+                <Suspense fallback={<Loading text="Loading analysis…" />}>
+                  <AnalysisPage />
+                </Suspense>
+              }
+            />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/reports" replace />} />
+          </Routes>
+        </Layout.Content>
+        <Layout.Footer className="app-footer">
+          Fortuna Web {Version.tag} · Server {serverVersion || "—"}
+        </Layout.Footer>
+      </Layout>
     </Layout>
   );
 }

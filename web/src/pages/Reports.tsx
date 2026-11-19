@@ -9,6 +9,7 @@ import {
   DatePicker,
   Input,
   Loading,
+  MessagePlugin,
   Popconfirm,
   Space,
   Switch,
@@ -255,7 +256,14 @@ function ReportDetail({ reportId }: { reportId: string }) {
   function open(record?: AssetRecord) {
     setEditing(record || null);
   }
-  async function sync(draft: RecordDraft, record?: AssetRecord) {
+  function clearStatus(id: string) {
+    setStatuses((previous) => {
+      const next = { ...previous };
+      delete next[id];
+      return next;
+    });
+  }
+  async function sync(draft: RecordDraft, record?: AssetRecord, quickInsert = false) {
     const id = record?.record_id || `local:${uuidv7()}`;
     const optimistic = { ...draft, record_id: id, user_id: record?.user_id || "" };
     setRecords((previous) =>
@@ -271,16 +279,21 @@ function ReportDetail({ reportId }: { reportId: string }) {
         draft,
       );
       setRecords((previous) => previous.map((item) => (item.record_id === id ? saved : item)));
-      setStatuses((previous) => {
-        const next = { ...previous };
-        delete next[id];
-        return next;
-      });
+      clearStatus(id);
+      void MessagePlugin.success("Record saved");
+      return true;
     } catch (error) {
-      setStatuses((previous) => ({
-        ...previous,
-        [id]: { error: error instanceof Error ? error.message : "Sync failed" },
-      }));
+      if (quickInsert) {
+        setRecords((previous) => previous.filter((item) => item.record_id !== id));
+        clearStatus(id);
+        showError(error);
+      } else {
+        setStatuses((previous) => ({
+          ...previous,
+          [id]: { error: error instanceof Error ? error.message : "Sync failed" },
+        }));
+      }
+      return false;
     }
   }
   async function remove(record: AssetRecord) {
@@ -289,11 +302,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
       if (!record.record_id.startsWith("local:"))
         await request("DELETE", `/records/${record.record_id}`);
       setRecords((previous) => previous.filter((item) => item.record_id !== record.record_id));
-      setStatuses((previous) => {
-        const next = { ...previous };
-        delete next[record.record_id];
-        return next;
-      });
+      clearStatus(record.record_id);
     } catch (error) {
       setStatuses((previous) => ({
         ...previous,
@@ -384,7 +393,11 @@ function ReportDetail({ reportId }: { reportId: string }) {
           <span className="muted">
             {visible.length} of {records.length} records
           </span>
-          {editable && <Button shape="round" onClick={() => open()}>Add record</Button>}
+          {editable && (
+            <Button shape="round" onClick={() => open()}>
+              Add record
+            </Button>
+          )}
           <Button
             shape="round"
             variant="outline"
@@ -448,7 +461,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
           initial={editing || undefined}
           reportId={reportId}
           close={() => setEditing(undefined)}
-          onSave={(draft) => void sync(draft, editing || undefined)}
+          onSave={(draft, quickInsert) => sync(draft, editing || undefined, quickInsert)}
         />
       )}
     </div>

@@ -11,6 +11,10 @@ import { FilterControls, ValuationControls } from "../components/Records";
 import { emptyFilters, filterRecords, useDefaultCurrency, usePrecision } from "../recordState";
 import type { AssetRecord, Report } from "../types";
 
+function localDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 export function AnalysisPage() {
   const { metadata, refresh, ensure } = useMetadata();
   const state = useLoad(async () => {
@@ -33,8 +37,7 @@ export function AnalysisPage() {
   const [selected, setSelected] = useState<string[] | null>(null);
   const available = (state.data?.reports || [])
     .filter((report) => {
-      const date = new Date(report.report_time);
-      const local = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      const local = localDate(new Date(report.report_time));
       return (!from || local >= from) && (!through || local <= through);
     })
     .sort((a, b) => Date.parse(a.report_time) - Date.parse(b.report_time));
@@ -118,29 +121,19 @@ export function AnalysisPage() {
       },
     ],
   };
-  function lastMonths(months: number) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - months);
-    setFrom(
-      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
-    );
-    setThrough("");
+  function selectRange(range: "ytd" | "year") {
+    const today = new Date();
+    const start = new Date(today);
+    if (range === "ytd") start.setMonth(0, 1);
+    else {
+      start.setFullYear(start.getFullYear() - 1);
+      if (start.getMonth() !== today.getMonth()) start.setDate(0);
+    }
+    setFrom(localDate(start));
+    setThrough(localDate(today));
   }
   return (
     <div className="stack">
-      <div className="page-heading">
-        <h1>Across your reports</h1>
-        <Button
-          variant="outline"
-          icon={<RefreshIcon />}
-          aria-label="Refresh"
-          title="Refresh"
-          loading={state.loading}
-          onClick={() => {
-            void state.refresh().catch(() => {});
-          }}
-        />
-      </div>
       {state.error && <Alert theme="error" message={state.error} />}
       <Card>
         <div className="toolbar">
@@ -156,11 +149,11 @@ export function AnalysisPage() {
             value={through}
             onChange={(value) => setThrough(String(value || ""))}
           />
-          <Button variant="text" onClick={() => lastMonths(8)}>
-            Last 8 months
+          <Button variant="text" onClick={() => selectRange("ytd")}>
+            YTD
           </Button>
-          <Button variant="text" onClick={() => lastMonths(36)}>
-            Last 3 years
+          <Button variant="text" onClick={() => selectRange("year")}>
+            Last 1 year
           </Button>
           <Button
             variant="text"
@@ -171,6 +164,16 @@ export function AnalysisPage() {
           >
             All time
           </Button>
+          <Button
+            variant="outline"
+            icon={<RefreshIcon />}
+            aria-label="Refresh"
+            title="Refresh"
+            loading={state.loading}
+            onClick={() => {
+              void state.refresh().catch(() => {});
+            }}
+          />
         </div>
         <div className="toolbar">
           <Select

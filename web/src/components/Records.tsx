@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
   Button,
   Card,
+  Checkbox,
   DatePicker,
   Form,
   Input,
@@ -12,11 +13,12 @@ import {
   Popconfirm,
   Select,
   Space,
+  Switch,
   Table,
   Textarea,
 } from "tdesign-react";
 import type { PrimaryTableCol } from "tdesign-react";
-import { DeleteIcon } from "tdesign-icons-react";
+import { DeleteIcon, EditIcon } from "tdesign-icons-react";
 import { EditorDialog, EditorField } from "./Editor";
 import {
   conversion,
@@ -30,7 +32,7 @@ import { useMetadata } from "../metadata";
 import { displayValue, selectString } from "../helpers";
 import { emptyFilters } from "../recordState";
 import type { RecordFilters } from "../recordState";
-import type { AssetRecord, ExchangeRate } from "../types";
+import type { AssetRecord, CustomField, ExchangeRate } from "../types";
 import { useTableSort } from "../tableState";
 
 export function FilterControls({
@@ -402,9 +404,14 @@ export function RecordTable({
           <Space direction="vertical" size="small">
             {status?.error && <span className="muted">Not synced: {status.error}</span>}
             <Space size="small">
-              <Button size="small" variant="text" onClick={() => onEdit?.(row)}>
-                Edit
-              </Button>
+              <Button
+                size="small"
+                variant="text"
+                icon={<EditIcon />}
+                aria-label="Edit"
+                title="Edit"
+                onClick={() => onEdit?.(row)}
+              />
               {status?.error && (
                 <Button size="small" variant="text" onClick={() => onRetry?.(row)}>
                   Retry
@@ -440,6 +447,22 @@ export function RecordTable({
 }
 
 export type RecordDraft = Omit<AssetRecord, "record_id" | "user_id">;
+const recordDefaults = {
+  content: "",
+  amount: 0,
+  effective_rate: 1,
+  currency_id: "",
+  asset_type_id: "",
+  institution_id: "",
+};
+
+function defaultCustomValue(field: CustomField) {
+  if (field.nullable) return null;
+  if (field.type === "str") return "";
+  if (field.type === "date") return new Date().toISOString().slice(0, 10);
+  return 0;
+}
+
 export function RecordEditor({
   initial,
   reportId,
@@ -449,183 +472,258 @@ export function RecordEditor({
   initial?: AssetRecord;
   reportId: string;
   close: () => void;
-  onSave: (draft: RecordDraft) => void;
+  onSave: (draft: RecordDraft, quickInsert: boolean) => Promise<boolean>;
 }) {
   const { metadata } = useMetadata();
-  const [draft, setDraft] = useState<RecordDraft>(() =>
-    initial
-      ? { ...initial }
-      : {
-          report_id: reportId,
-          content: "",
-          amount: 0,
-          effective_rate: 1,
-          currency_id: "",
-          asset_type_id: "",
-          institution_id: "",
-          asset_custom_fields_data: [],
-        },
+  const [draft, setDraft] = useState<RecordDraft>(
+    () => initial ?? { ...recordDefaults, report_id: reportId, asset_custom_fields_data: [] },
   );
-  const [error, setError] = useState("");
-  const fields = customFields(
-    metadata.asset_types.find((item) => item.asset_type_id === draft.asset_type_id)?.custom_fields,
-  );
+  const [quickInsert, setQuickInsert] = useState(false);
+  const [kept, setKept] = useState<Set<string | number>>(() => new Set());
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  const [attempted, setAttempted] = useState(false);
+  const assetType = metadata.asset_types.find((item) => item.asset_type_id === draft.asset_type_id);
+  const fields = customFields(assetType?.custom_fields);
   const values = Array.isArray(draft.asset_custom_fields_data)
     ? draft.asset_custom_fields_data
     : [];
+  const invalid = {
+    type: !assetType,
+    institution: !metadata.institutions.some(
+      (item) => item.institution_id === draft.institution_id,
+    ),
+    currency: !metadata.currencies.some((item) => item.currency_id === draft.currency_id),
+    amount: !Number.isFinite(draft.amount),
+    rate: !Number.isFinite(draft.effective_rate),
+  };
+  const invalidCustom = fields.map((field, index) => {
+    const value = values[index];
+    return (
+      !validFieldValue(field, value) ||
+      (!field.nullable && typeof value === "string" && !value.trim())
+    );
+  });
   const update = (value: Partial<RecordDraft>) =>
     setDraft((previous) => ({ ...previous, ...value }));
+  function keepBox(key: keyof typeof recordDefaults | number, label: string) {
+    if (!quickInsert) return null;
+    return (
+      <Checkbox
+        title={`Keep ${label}`}
+        checked={kept.has(key)}
+        onChange={(checked) => {
+          setKept((previous) => {
+            const next = new Set(previous);
+            if (checked) {
+              next.add(key);
+              if (typeof key === "number") next.add("asset_type_id");
+            } else {
+              next.delete(key);
+              if (key === "asset_type_id")
+                for (const field of fields) next.delete(field.data_order);
+            }
+            return next;
+          });
+        }}
+      >
+        <span className="sr-only">Keep {label}</span>
+      </Checkbox>
+    );
+  }
   function chooseType(id: string) {
+    if (id === draft.asset_type_id) return;
+    setKept((previous) => new Set([...previous].filter((key) => typeof key === "string")));
     const definitions = customFields(
       metadata.asset_types.find((item) => item.asset_type_id === id)?.custom_fields,
     );
     update({
       asset_type_id: id,
-      asset_custom_fields_data: definitions.map((field) =>
-        field.nullable
-          ? null
-          : field.type === "str"
-            ? ""
-            : field.type === "date"
-              ? new Date().toISOString().slice(0, 10)
-              : 0,
-      ),
+      asset_custom_fields_data: definitions.map(defaultCustomValue),
     });
   }
-  function save() {
-    if (
-      !metadata.currencies.some((item) => item.currency_id === draft.currency_id) ||
-      !metadata.asset_types.some((item) => item.asset_type_id === draft.asset_type_id) ||
-      !metadata.institutions.some((item) => item.institution_id === draft.institution_id)
-    ) {
-      setError("Choose a currency, asset type, and institution");
+  async function save() {
+    if (submitting.current) return;
+    if (Object.values(invalid).some(Boolean) || invalidCustom.some(Boolean)) {
+      setAttempted(true);
       return;
     }
-    if (!Number.isFinite(draft.amount) || !Number.isFinite(draft.effective_rate)) {
-      setError("Amount and effective rate must be numbers");
-      return;
-    }
-    const invalid = fields.find((field, index) => !validFieldValue(field, values[index]));
-    if (invalid) {
-      setError(`Enter a valid value for ${invalid.field_name}`);
-      return;
-    }
-    onSave({
+    const record = {
       ...draft,
       content: draft.content.replace(/\r\n?/g, "\n"),
       asset_custom_fields_data: fields.map((_, index) => values[index] ?? null),
-    });
-    close();
+    };
+    submitting.current = true;
+    if (!quickInsert) {
+      void onSave(record, false);
+      close();
+      return;
+    }
+    setSaving(true);
+    try {
+      if (await onSave(record, true)) {
+        setAttempted(false);
+        const reset = Object.entries(recordDefaults).filter(([key]) => !kept.has(key));
+        setDraft({
+          ...record,
+          ...Object.fromEntries(reset),
+          asset_custom_fields_data: kept.has("asset_type_id")
+            ? fields.map((field, i) =>
+                kept.has(field.data_order) ? values[i] : defaultCustomValue(field),
+              )
+            : [],
+        });
+      }
+    } finally {
+      submitting.current = false;
+      setSaving(false);
+    }
   }
   return (
     <EditorDialog
       title={initial ? "Edit record" : "Add record"}
       saveLabel="Save record"
-      onSave={save}
+      saving={saving}
+      onSave={() => void save()}
       onClose={close}
     >
-      {error && <Alert theme="error" message={error} />}
-      <Form labelAlign="top">
-        <div className="form-grid">
-          <EditorField label="Asset type">
-            <Select
-              autofocus
-              filterable
-              value={draft.asset_type_id}
-              options={metadata.asset_types.map((item) => ({
-                value: item.asset_type_id,
-                label: item.name,
-              }))}
-              onChange={(value) => chooseType(selectString(value))}
+      <div inert={saving}>
+        {!initial && (
+          <label className="toolbar">
+            Quick insert mode
+            <Switch
+              value={quickInsert}
+              aria-label="Quick insert mode"
+              aria-checked={quickInsert}
+              onChange={(value) => setQuickInsert(Boolean(value))}
             />
-          </EditorField>
-          <EditorField label="Institution">
-            <Select
-              filterable
-              value={draft.institution_id}
-              options={metadata.institutions.map((item) => ({
-                value: item.institution_id,
-                label: item.name,
-              }))}
-              onChange={(value) => update({ institution_id: selectString(value) })}
-            />
-          </EditorField>
-          <EditorField label="Currency">
-            <Select
-              filterable
-              value={draft.currency_id}
-              options={metadata.currencies.map((item) => ({
-                value: item.currency_id,
-                label: item.name,
-              }))}
-              onChange={(value) => update({ currency_id: selectString(value) })}
-            />
-          </EditorField>
-          <EditorField label="Amount">
-            <InputNumber
-              value={draft.amount}
-              onChange={(value) => update({ amount: typeof value === "number" ? value : NaN })}
-            />
-          </EditorField>
-          <EditorField label="Effective rate">
-            <InputNumber
-              value={draft.effective_rate}
-              onChange={(value) =>
-                update({ effective_rate: typeof value === "number" ? value : NaN })
-              }
-            />
-          </EditorField>
-          <EditorField label="Content" className="wide">
-            <Textarea
-              value={draft.content}
-              onChange={(content) => update({ content })}
-              autosize={{ minRows: 2, maxRows: 6 }}
-            />
-          </EditorField>
-          {[...fields]
-            .sort((a, b) => a.display_order - b.display_order)
-            .map((field) => {
-              const index = fields.findIndex((item) => item.data_order === field.data_order);
-              const value = values[index];
-              function change(value: unknown) {
-                const copy = fields.map((_, index) => values[index] ?? null);
-                copy[index] = value;
-                update({ asset_custom_fields_data: copy });
-              }
-              return (
-                <EditorField
-                  key={field.data_order}
-                  label={`${field.field_name}${field.nullable ? " (optional)" : " *"}`}
-                  help={`${field.prefix}${field.postfix ? ` … ${field.postfix}` : ""}`}
-                >
-                  {field.type === "str" ? (
-                    <Input
-                      clearable
-                      value={typeof value === "string" ? value : ""}
-                      onChange={(text) => change(field.nullable && !text ? null : text)}
-                    />
-                  ) : field.type === "date" ? (
-                    <DatePicker
-                      clearable
-                      value={
-                        typeof value === "string" && Number.isFinite(Date.parse(value))
-                          ? value.slice(0, 10)
-                          : ""
-                      }
-                      onChange={(date) => change(date ? String(date) : null)}
-                    />
-                  ) : (
-                    <InputNumber
-                      value={typeof value === "number" ? value : undefined}
-                      decimalPlaces={field.type === "int" ? 0 : undefined}
-                      onChange={(number) => change(typeof number === "number" ? number : null)}
-                    />
-                  )}
-                </EditorField>
-              );
-            })}
-        </div>
-      </Form>
+          </label>
+        )}
+        <Form labelAlign="top">
+          <div className={quickInsert ? "form-grid quick-insert-grid" : "form-grid"}>
+            <EditorField
+              label="Asset type"
+              warning={attempted && invalid.type && "Choose an asset type"}
+            >
+              <Select
+                autofocus
+                filterable
+                value={draft.asset_type_id}
+                options={metadata.asset_types.map((item) => ({
+                  value: item.asset_type_id,
+                  label: item.name,
+                }))}
+                onChange={(value) => chooseType(selectString(value))}
+              />
+              {keepBox("asset_type_id", "asset type")}
+            </EditorField>
+            <EditorField
+              label="Institution"
+              warning={attempted && invalid.institution && "Choose an institution"}
+            >
+              <Select
+                filterable
+                value={draft.institution_id}
+                options={metadata.institutions.map((item) => ({
+                  value: item.institution_id,
+                  label: item.name,
+                }))}
+                onChange={(value) => update({ institution_id: selectString(value) })}
+              />
+              {keepBox("institution_id", "institution")}
+            </EditorField>
+            <EditorField
+              label="Currency"
+              warning={attempted && invalid.currency && "Choose a currency"}
+            >
+              <Select
+                filterable
+                value={draft.currency_id}
+                options={metadata.currencies.map((item) => ({
+                  value: item.currency_id,
+                  label: item.name,
+                }))}
+                onChange={(value) => update({ currency_id: selectString(value) })}
+              />
+              {keepBox("currency_id", "currency")}
+            </EditorField>
+            <EditorField label="Amount" warning={attempted && invalid.amount && "Enter a number"}>
+              <InputNumber
+                value={invalid.amount ? "" : draft.amount}
+                onChange={(value) => update({ amount: typeof value === "number" ? value : NaN })}
+              />
+              {keepBox("amount", "amount")}
+            </EditorField>
+            <EditorField
+              label="Effective rate"
+              warning={attempted && invalid.rate && "Enter a number"}
+            >
+              <InputNumber
+                value={invalid.rate ? "" : draft.effective_rate}
+                onChange={(value) =>
+                  update({ effective_rate: typeof value === "number" ? value : NaN })
+                }
+              />
+              {keepBox("effective_rate", "effective rate")}
+            </EditorField>
+            <EditorField label="Content" className="wide">
+              <Textarea
+                value={draft.content}
+                onChange={(content) => update({ content })}
+                autosize={{ minRows: 2, maxRows: 6 }}
+              />
+              {keepBox("content", "content")}
+            </EditorField>
+            {[...fields]
+              .sort((a, b) => a.display_order - b.display_order)
+              .map((field) => {
+                const index = fields.findIndex((item) => item.data_order === field.data_order);
+                const value = values[index];
+                function change(value: unknown) {
+                  const copy = fields.map((_, index) => values[index] ?? null);
+                  copy[index] = value;
+                  update({ asset_custom_fields_data: copy });
+                }
+                return (
+                  <EditorField
+                    key={`${draft.asset_type_id}:${field.data_order}`}
+                    label={`${field.field_name}${field.nullable ? " (optional)" : " *"}`}
+                    warning={attempted && invalidCustom[index] && "Enter a valid value"}
+                    help={`${field.prefix}${field.postfix ? ` … ${field.postfix}` : ""}`}
+                  >
+                    {field.type === "str" ? (
+                      <Input
+                        clearable
+                        value={typeof value === "string" ? value : ""}
+                        onChange={(text) => change(field.nullable && !text ? null : text)}
+                      />
+                    ) : field.type === "date" ? (
+                      <DatePicker
+                        clearable
+                        value={
+                          typeof value === "string" && Number.isFinite(Date.parse(value))
+                            ? value.slice(0, 10)
+                            : ""
+                        }
+                        onChange={(date) => change(date ? String(date) : null)}
+                      />
+                    ) : (
+                      <InputNumber
+                        value={typeof value === "number" ? value : ""}
+                        decimalPlaces={field.type === "int" ? 0 : undefined}
+                        onChange={(number) => change(typeof number === "number" ? number : null)}
+                      />
+                    )}
+                    {keepBox(field.data_order, field.field_name)}
+                  </EditorField>
+                );
+              })}
+          </div>
+        </Form>
+        {quickInsert && (
+          <p className="muted">Check a field to keep its value for the next record.</p>
+        )}
+      </div>
     </EditorDialog>
   );
 }

@@ -1,14 +1,21 @@
 /* SPDX-License-Identifier: MulanPSL-2.0 */
 .app-layout {
   min-height: 100vh;
+}
+.workspace-content {
+  min-width: 0;
   background: #f5f7f6;
 }
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 32px;
-  border-bottom: 1px solid #e7ece9;
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  flex: none;
+  z-index: 2;
+}
+.app-sidebar .t-default-menu {
+  height: 100%;
+  border-right: 1px solid var(--td-component-stroke);
 }
 .brand {
   font-size: 22px;
@@ -16,12 +23,6 @@
 }
 .muted {
   color: #6b7972;
-}
-.app-layout > .t-menu {
-  width: 100%;
-}
-.app-layout > .t-default-menu {
-  width: 100%;
 }
 .page {
   width: 100%;
@@ -86,6 +87,24 @@
 .access-card .t-radio-group {
   align-self: flex-start;
 }
+.editor-dialog .t-dialog__position.t-dialog--center {
+  height: 100%;
+  padding: 16px;
+}
+.editor-dialog .t-dialog {
+  /* TDesign sets display: block inline when opening the dialog. */
+  display: flex !important;
+  flex-direction: column;
+  max-width: 100%;
+  max-height: 100%;
+}
+.editor-dialog .t-dialog__body {
+  overscroll-behavior: contain;
+}
+.editor-dialog .t-form__label--top {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -93,6 +112,20 @@
 }
 .form-grid .wide {
   grid-column: 1 / -1;
+}
+.quick-insert-grid .t-form__controls-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.sr-only {
+  position: absolute;
+  inset-inline-start: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .form-grid .t-input-number,
 .form-grid .t-date-picker {
@@ -146,18 +179,15 @@
   .page {
     padding: 20px 14px;
   }
-  .app-header {
-    padding: 0 14px;
-  }
-  .desktop-label {
-    display: none;
+  .app-sidebar {
+    width: 64px;
   }
   .page-heading {
     align-items: flex-start;
     flex-wrap: wrap;
   }
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .toolbar .t-select__wrap {
     width: 100%;

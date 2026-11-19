@@ -15,7 +15,7 @@ import {
   Textarea,
 } from "tdesign-react";
 import type { PrimaryTableCol } from "tdesign-react";
-import { DeleteIcon, RefreshIcon } from "tdesign-icons-react";
+import { DeleteIcon, EditIcon, RefreshIcon } from "tdesign-icons-react";
 import { request, setToken } from "../api";
 import { action, selectString, settingsObject, showError } from "../helpers";
 import { useLoad } from "../useLoad";
@@ -74,10 +74,12 @@ function saveEntry(metadata: Metadata, entry: MetadataEntry): Metadata {
 
 function FieldEditor({
   fields,
+  attempted,
   onChange,
   nextOrder,
 }: {
   fields: CustomField[];
+  attempted: boolean;
   onChange: (value: CustomField[]) => void;
   nextOrder: () => number;
 }) {
@@ -97,7 +99,10 @@ function FieldEditor({
       {ordered.map((field, index) => (
         <div className="field-row" key={field.data_order}>
           <div className="form-grid">
-            <EditorField label="Field name">
+            <EditorField
+              label="Field name"
+              warning={attempted && !field.field_name.trim() && "Enter a field name"}
+            >
               <Input
                 value={field.field_name}
                 onChange={(field_name) => update(field.data_order, { field_name })}
@@ -211,23 +216,18 @@ function MetadataEditor({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const invalidColor = resource === "asset-types" && !/^[0-9A-F]{6}$/.test(color);
   const submitting = useRef(false);
   async function save() {
     if (submitting.current) return;
-    if (!name.trim()) {
-      setError("Enter a name");
-      return;
-    }
-    if (
-      resource === "asset-types" &&
-      (!/^[0-9A-F]{6}$/.test(color) || fields.some((field) => !field.field_name.trim()))
-    ) {
-      setError("Use a six-character hexadecimal color and give every field a name");
+    setError("");
+    if (!name.trim() || invalidColor || fields.some((field) => !field.field_name.trim())) {
+      setAttempted(true);
       return;
     }
     setSaving(true);
     submitting.current = true;
-    setError("");
     try {
       const saved = await request<MetadataEntry>(
         initial ? "PATCH" : "POST",
@@ -266,7 +266,7 @@ function MetadataEditor({
         />
       )}
       <Form labelAlign="top">
-        <EditorField label="Name">
+        <EditorField label="Name" warning={attempted && !name.trim() && "Enter a name"}>
           <Input autofocus value={name} onChange={setName} />
         </EditorField>
         <EditorField label="Note">
@@ -274,7 +274,10 @@ function MetadataEditor({
         </EditorField>
         {resource === "asset-types" && (
           <>
-            <EditorField label="Color (six hex characters)">
+            <EditorField
+              label="Color (six hex characters)"
+              warning={attempted && invalidColor && "Use six hexadecimal characters"}
+            >
               <Input
                 value={color}
                 onChange={(value) => setColor(value.toUpperCase())}
@@ -284,6 +287,7 @@ function MetadataEditor({
             </EditorField>
             <FieldEditor
               fields={fields}
+              attempted={attempted}
               onChange={setFields}
               nextOrder={() => {
                 const next = highOrder + 1;
@@ -342,9 +346,15 @@ function MetadataSettings({ resource }: { resource: Resource }) {
       width: 180,
       cell: ({ row }) => (
         <Space>
-          <Button variant="text" size="small" disabled={loading} onClick={() => open(row.id)}>
-            Edit
-          </Button>
+          <Button
+            variant="text"
+            size="small"
+            icon={<EditIcon />}
+            aria-label="Edit"
+            title="Edit"
+            disabled={loading}
+            onClick={() => open(row.id)}
+          />
           <Popconfirm
             content="Delete this entry? Entries used by records cannot be deleted."
             onConfirm={() =>
@@ -548,14 +558,7 @@ function AccountSettings() {
                 }}
               />
             }
-            cancelBtn={
-              <Button
-                shape="round"
-                size="small"
-                content="Cancel"
-                theme="default"
-              />
-            }
+            cancelBtn={<Button shape="round" size="small" content="Cancel" theme="default" />}
           >
             <Button
               theme="danger"
