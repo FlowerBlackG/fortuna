@@ -14,7 +14,7 @@ PASSWORD_HASHER = PasswordHasher(
 )
 
 
-def password_matches(encoded, password):
+def password_matches(encoded: str, password: str) -> bool:
     try:
         return PASSWORD_HASHER.verify(encoded, password)
     except (VerificationError, InvalidHashError):
@@ -28,12 +28,12 @@ class Session:
 
 
 class TokenStore:
-    def __init__(self, lifetime):
+    def __init__(self, lifetime: int) -> None:
         self.lifetime = lifetime
         self.tokens: dict[str, Session] = {}
         self.lock = Lock()
 
-    def create(self, user_id):
+    def create(self, user_id: str) -> str:
         now = datetime.now(timezone.utc)
         token = f"{user_id[:16]}.{uuid.uuid7()}.{secrets.randbelow(0xF00000) + 0x100000:06X}"
         with self.lock:
@@ -41,7 +41,7 @@ class TokenStore:
             self.tokens[token] = Session(user_id, now + timedelta(seconds=self.lifetime))
         return token
 
-    def resolve(self, token):
+    def resolve(self, token: str) -> Session | None:
         with self.lock:
             session = self.tokens.get(token)
             if session and session.expires_at <= datetime.now(timezone.utc):
@@ -49,10 +49,10 @@ class TokenStore:
                 return None
             return session
 
-    def revoke(self, token):
+    def revoke(self, token: str) -> None:
         with self.lock:
             self.tokens.pop(token, None)
 
-    def revoke_user(self, user_id):
+    def revoke_user(self, user_id: str) -> None:
         with self.lock:
             self.tokens = {key: value for key, value in self.tokens.items() if value.user_id != user_id}

@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MulanPSL-2.0
 import logging
 
+from config import Config
 
-def configure_logging(config):
+
+def configure_logging(config: Config) -> None:
     if config.logging is None:
         handler = logging.StreamHandler()
     else:

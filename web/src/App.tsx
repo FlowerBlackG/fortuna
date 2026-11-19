@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-import { lazy, Suspense, useEffect, useEffectEvent, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { Alert, Button, ConfigProvider, Layout, Loading, Menu, Space } from "tdesign-react";
 import enUS from "tdesign-react/es/locale/en_US";
-import { ChartLineIcon, FileIcon, SettingIcon, WalletIcon } from "tdesign-icons-react";
+import {
+  ChartLineIcon,
+  FileIcon,
+  LogoutIcon,
+  ServerIcon,
+  SettingIcon,
+  WalletIcon,
+} from "tdesign-icons-react";
 import { authToken, ping, request, serverAddress, sessionEvents, setServer, setToken } from "./api";
 import { MetadataProvider } from "./data";
 import { useMetadata } from "./metadata";
@@ -11,13 +18,14 @@ import { action } from "./helpers";
 import { AuthPage, ServerPage } from "./pages/Access";
 import { SettingsPage } from "./pages/Settings";
 import { ReportsPage, ReportPage } from "./pages/Reports";
+import Version from "./version";
 import "./App.css";
 
 const AnalysisPage = lazy(() =>
   import("./pages/Analysis").then((module) => ({ default: module.AnalysisPage })),
 );
 
-function Workspace() {
+function Workspace({ serverVersion }: { serverVersion: string }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { error, refresh } = useMetadata();
@@ -30,20 +38,25 @@ function Workspace() {
           <span className="muted desktop-label">Personal asset settlement</span>
         </Space>
         <Space>
-          <Button variant="text" onClick={() => navigate("/server")}>
-            Server
-          </Button>
           <Button
             variant="text"
+            icon={<ServerIcon />}
+            aria-label="Server"
+            title="Server"
+            onClick={() => navigate("/server")}
+          />
+          <Button
+            variant="text"
+            icon={<LogoutIcon />}
+            aria-label="Log out"
+            title="Log out"
             onClick={() =>
               action(async () => {
                 await request("POST", "/logout");
                 setToken("");
               })
             }
-          >
-            Log out
-          </Button>
+          />
         </Space>
       </Layout.Header>
       <Menu.HeadMenu
@@ -94,7 +107,7 @@ function Workspace() {
         </Routes>
       </Layout.Content>
       <Layout.Footer className="app-footer">
-        Fortuna · Your assets, clearly understood.
+        Fortuna Web {Version.tag} · Server {serverVersion || "—"}
       </Layout.Footer>
     </Layout>
   );
@@ -104,12 +117,13 @@ function Application() {
   const navigate = useNavigate();
   const location = useLocation();
   const [identity, setIdentity] = useState(authToken());
-  const [checking, setChecking] = useState(true);
-  const configureBackend = useEffectEvent(() => {
-    void navigate("/server", { replace: true });
-  });
+  const [address, setAddress] = useState(serverAddress() || window.location.origin);
+  const [connection, setConnection] = useState<{ address: string; version: string | null }>();
   useEffect(() => {
-    const session = () => setIdentity(authToken());
+    const session = () => {
+      setIdentity(authToken());
+      setAddress(serverAddress() || window.location.origin);
+    };
     const configure = () => navigate("/server");
     sessionEvents.addEventListener("session", session);
     sessionEvents.addEventListener("configure", configure);
@@ -121,30 +135,29 @@ function Application() {
     };
   }, [navigate]);
   useEffect(() => {
+    if (connection?.address === address) return;
     let active = true;
-    const address = serverAddress() || window.location.origin;
     void ping(address)
-      .then(() => {
-        if (active && !serverAddress()) setServer(address);
+      .then((version) => {
+        if (!active) return;
+        if (!serverAddress()) setServer(address);
+        setConnection({ address, version });
       })
       .catch(() => {
-        if (active) configureBackend();
-      })
-      .finally(() => {
-        if (active) setChecking(false);
+        if (active) setConnection({ address, version: null });
       });
     return () => {
       active = false;
     };
-  }, []);
-  if (checking) return <Loading fullscreen text="Connecting to Fortuna…" />;
-  if (location.pathname === "/server") return <ServerPage />;
-  if (!serverAddress()) return <Navigate to="/server" replace />;
+  }, [address, connection?.address]);
+  if (location.pathname === "/server") return <ServerPage onConnected={setConnection} />;
+  if (connection?.address !== address) return <Loading fullscreen text="Connecting to Fortuna…" />;
+  if (!serverAddress() || connection.version === null) return <Navigate to="/server" replace />;
   if (!identity)
     return location.pathname === "/login" ? <AuthPage /> : <Navigate to="/login" replace />;
   return (
     <MetadataProvider key={`${serverAddress()}:${identity}`}>
-      <Workspace />
+      <Workspace serverVersion={connection.version} />
     </MetadataProvider>
   );
 }

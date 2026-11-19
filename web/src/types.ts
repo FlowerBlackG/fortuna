@@ -1,9 +1,4 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-export interface IResponse<T> {
-  code: number;
-  msg: string;
-  data: T;
-}
 export interface Account {
   user_id: string;
   username: string;
@@ -50,6 +45,7 @@ export interface Report {
   report_id: string;
   user_id: string;
   title: string;
+  report_time: string;
   create_time: string;
   update_time: string;
   currency_totals?: CurrencyTotal[];

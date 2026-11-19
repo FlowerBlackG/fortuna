@@ -73,11 +73,18 @@
   width: 100%;
   max-width: 460px;
 }
+.access-card .t-card__body,
 .access-card .t-form {
-  margin: 24px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
 }
-.access-card .t-alert {
-  margin-top: 16px;
+.access-card .t-form__item {
+  margin-bottom: 0;
+}
+.access-card .t-radio-group {
+  align-self: flex-start;
 }
 .form-grid {
   display: grid;

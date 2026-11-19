@@ -6,6 +6,7 @@ import {
   Alert,
   Button,
   Card,
+  DatePicker,
   Input,
   Loading,
   Popconfirm,
@@ -57,21 +58,29 @@ export function ReportsPage() {
   async function create() {
     setCreating(true);
     try {
-      const report = await request<Report>("POST", "/reports", { title: "" });
+      const report = await request<Report>("POST", "/reports", {
+        report_time: new Date().toISOString(),
+      });
       await navigate(`/reports/${report.report_id}`);
     } finally {
       setCreating(false);
     }
   }
-  const rows = [...(state.data || [])]
-    .filter((report) => reportTitle(report).toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => b.create_time.localeCompare(a.create_time));
+  const rows = (state.data || []).filter((report) =>
+    reportTitle(report).toLowerCase().includes(search.toLowerCase()),
+  );
   const columns: PrimaryTableCol<Report>[] = [
     {
       colKey: "title",
       title: "Report",
       sorter: (a, b) => reportTitle(a).localeCompare(reportTitle(b)),
       cell: ({ row }) => <Link to={`/reports/${row.report_id}`}>{reportTitle(row)}</Link>,
+    },
+    {
+      colKey: "report_time",
+      title: "Report time",
+      sorter: (a, b) => Date.parse(a.report_time) - Date.parse(b.report_time),
+      cell: ({ row }) => new Date(row.report_time).toLocaleString(),
     },
     {
       colKey: "create_time",
@@ -127,14 +136,11 @@ export function ReportsPage() {
           : `${number(value, decimals)} ${defaultCurrency.name}`;
       },
     });
-  const sorting = useTableSort(rows, columns);
+  const sorting = useTableSort(rows, columns, { sortBy: "report_time", descending: true });
   return (
     <>
       <div className="page-heading">
-        <div>
-          <h1>Reports</h1>
-          <p className="muted">A snapshot of your assets, whenever you need one.</p>
-        </div>
+        <h1>Reports</h1>
         <Button loading={creating} onClick={() => action(create)}>
           Create report
         </Button>
@@ -185,6 +191,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
   const [ratesBusy, setRatesBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [savedTitle, setSavedTitle] = useState("");
+  const [savingTime, setSavingTime] = useState(false);
   const state = useLoad(async () => {
     const [report, rows] = await Promise.all([
       request<Report>("GET", `/reports/${reportId}`),
@@ -207,7 +214,9 @@ function ReportDetail({ reportId }: { reportId: string }) {
   const [currency, setCurrency] = useDefaultCurrency();
   const [decimals, setDecimals] = usePrecision();
   const unsynced =
-    ratesBusy || Object.values(statuses).some((status) => status.saving || status.error);
+    savingTime ||
+    ratesBusy ||
+    Object.values(statuses).some((status) => status.saving || status.error);
   useEffect(() => {
     if (!unsynced) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -216,6 +225,17 @@ function ReportDetail({ reportId }: { reportId: string }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsynced]);
+  async function saveTime(timestamp: number) {
+    setSavingTime(true);
+    try {
+      const report = await request<Report>("PATCH", `/reports/${reportId}`, {
+        report_time: new Date(timestamp).toISOString(),
+      });
+      state.setData((current) => current && { ...current, report });
+    } finally {
+      setSavingTime(false);
+    }
+  }
   function saveTitle() {
     if (title === savedTitle) return;
     const value = title;
@@ -304,26 +324,38 @@ function ReportDetail({ reportId }: { reportId: string }) {
         <div>
           <Link to="/reports">← All reports</Link>
           <h1>{state.data ? reportTitle({ ...state.data.report, title }) : "Report"}</h1>
-          <p className="muted">Records sync individually. There is no final save step.</p>
+          {!editable && state.data && (
+            <p className="muted">
+              Report time: {new Date(state.data.report.report_time).toLocaleString()}
+            </p>
+          )}
         </div>
         <Space>
           <span>Editing</span>
           <Switch
             value={editable}
-            disabled={ratesBusy}
+            disabled={unsynced}
             onChange={(value) => setEditable(Boolean(value))}
           />
         </Space>
       </div>
-      {unsynced && (
-        <Alert
-          theme="warning"
-          message="Report changes are syncing or need a retry. Keep this report open until they finish."
-        />
-      )}
       <Card>
         {editable && (
           <div className="toolbar">
+            {state.data && (
+              <DatePicker
+                label="Report time"
+                enableTimePicker
+                allowInput
+                valueType="time-stamp"
+                format="YYYY-MM-DD HH:mm:ss"
+                value={Date.parse(state.data.report.report_time)}
+                disabled={savingTime || state.loading}
+                onChange={(value) => {
+                  if (typeof value === "number") action(() => saveTime(value));
+                }}
+              />
+            )}
             <Input
               style={{ maxWidth: 500 }}
               value={title}

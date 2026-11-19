@@ -2,11 +2,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Alert, Button, Card, Form, Input, Radio, Space } from "tdesign-react";
-import { WalletIcon } from "tdesign-icons-react";
+import { ServerIcon, WalletIcon } from "tdesign-icons-react";
 import { authToken, ping, request, serverAddress, setServer, setToken } from "../api";
 import type { Account } from "../types";
 
-export function ServerPage() {
+export function ServerPage({
+  onConnected,
+}: {
+  onConnected: (server: { address: string; version: string }) => void;
+}) {
   const navigate = useNavigate();
   const [address, setAddress] = useState(serverAddress() || window.location.origin);
   const [loading, setLoading] = useState(false);
@@ -15,8 +19,9 @@ export function ServerPage() {
     setLoading(true);
     setError("");
     try {
-      await ping(address);
+      const version = await ping(address);
       setServer(address);
+      onConnected({ address: serverAddress(), version });
       await navigate(authToken() ? "/reports" : "/login");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Connection failed");
@@ -27,12 +32,9 @@ export function ServerPage() {
   return (
     <main className="access-page">
       <Card title="Connect to your Fortuna server" className="access-card">
-        <p className="muted">
-          Enter the server address. It is saved in this browser and can be changed anytime.
-        </p>
         {error && <Alert theme="error" message={error} />}
         <Form labelAlign="top" onSubmit={() => void connect()}>
-          <Form.FormItem label="Server address">
+          <Form.FormItem label="Server address" initialData={address}>
             <Input value={address} onChange={setAddress} placeholder="http://localhost:5000" />
           </Form.FormItem>
           <Space>
@@ -91,7 +93,6 @@ export function AuthPage() {
           <WalletIcon size="32" />
           <h1>Fortuna</h1>
         </Space>
-        <p className="muted">A clear view of everything you hold.</p>
         <Radio.Group
           variant="default-filled"
           value={mode}
@@ -130,7 +131,7 @@ export function AuthPage() {
             {mode === "login" ? "Log in" : "Create account"}
           </Button>
         </Form>
-        <Button variant="text" block onClick={() => navigate("/server")}>
+        <Button variant="text" icon={<ServerIcon />} block onClick={() => navigate("/server")}>
           Server: {serverAddress()}
         </Button>
       </Card>

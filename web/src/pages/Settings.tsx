@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   Checkbox,
-  Dialog,
   Form,
   Input,
   Popconfirm,
@@ -22,6 +21,7 @@ import { action, selectString, settingsObject, showError } from "../helpers";
 import { useLoad } from "../useLoad";
 import { useMetadata } from "../metadata";
 import { customFields } from "../calculations";
+import { EditorDialog, EditorField } from "../components/Editor";
 import type { Account, AssetType, Currency, CustomField, Institution, Metadata } from "../types";
 
 type Resource = "currencies" | "institutions" | "asset-types";
@@ -93,20 +93,17 @@ function FieldEditor({
   return (
     <div>
       <h2>Custom fields</h2>
-      <p className="muted">
-        Display order can change freely. Removing a field also removes its values from existing
-        records when you save.
-      </p>
+      <p className="muted">Removing a field deletes its values from existing records.</p>
       {ordered.map((field, index) => (
         <div className="field-row" key={field.data_order}>
           <div className="form-grid">
-            <Form.FormItem label="Field name">
+            <EditorField label="Field name">
               <Input
                 value={field.field_name}
                 onChange={(field_name) => update(field.data_order, { field_name })}
               />
-            </Form.FormItem>
-            <Form.FormItem label="Type">
+            </EditorField>
+            <EditorField label="Type">
               <Select
                 value={field.type}
                 options={["str", "int", "float", "date"].map((value) => ({
@@ -117,19 +114,19 @@ function FieldEditor({
                   update(field.data_order, { type: value as CustomField["type"] })
                 }
               />
-            </Form.FormItem>
-            <Form.FormItem label="Prefix">
+            </EditorField>
+            <EditorField label="Prefix">
               <Input
                 value={field.prefix}
                 onChange={(prefix) => update(field.data_order, { prefix })}
               />
-            </Form.FormItem>
-            <Form.FormItem label="Postfix">
+            </EditorField>
+            <EditorField label="Postfix">
               <Input
                 value={field.postfix}
                 onChange={(postfix) => update(field.data_order, { postfix })}
               />
-            </Form.FormItem>
+            </EditorField>
           </div>
           <Space align="center" breakLine>
             <Checkbox
@@ -255,14 +252,11 @@ function MetadataEditor({
     (!Array.isArray(asset.custom_fields) ||
       customFields(asset.custom_fields).length !== asset.custom_fields.length);
   return (
-    <Dialog
-      visible
-      header={`${initial ? "Edit" : "Add"} ${resource === "asset-types" ? "asset type" : resource === "currencies" ? "currency" : "institution"}`}
-      width={720}
-      confirmBtn={{ content: "Save", loading: saving }}
-      onConfirm={() => void save()}
+    <EditorDialog
+      title={`${initial ? "Edit" : "Add"} ${resource === "asset-types" ? "asset type" : resource === "currencies" ? "currency" : "institution"}`}
+      saving={saving}
+      onSave={() => void save()}
       onClose={close}
-      closeOnOverlayClick={false}
     >
       {error && <Alert theme="error" message={error} />}
       {malformed && (
@@ -272,22 +266,22 @@ function MetadataEditor({
         />
       )}
       <Form labelAlign="top">
-        <Form.FormItem label="Name">
-          <Input value={name} onChange={setName} />
-        </Form.FormItem>
-        <Form.FormItem label="Note">
+        <EditorField label="Name">
+          <Input autofocus value={name} onChange={setName} />
+        </EditorField>
+        <EditorField label="Note">
           <Textarea value={note} onChange={setNote} />
-        </Form.FormItem>
+        </EditorField>
         {resource === "asset-types" && (
           <>
-            <Form.FormItem label="Color (six hex characters)">
+            <EditorField label="Color (six hex characters)">
               <Input
                 value={color}
                 onChange={(value) => setColor(value.toUpperCase())}
                 maxlength={6}
                 prefixIcon={<span style={{ color: `#${color}` }}>●</span>}
               />
-            </Form.FormItem>
+            </EditorField>
             <FieldEditor
               fields={fields}
               onChange={setFields}
@@ -300,7 +294,7 @@ function MetadataEditor({
           </>
         )}
       </Form>
-    </Dialog>
+    </EditorDialog>
   );
 }
 
@@ -534,7 +528,7 @@ function AccountSettings() {
             autocomplete="new-password"
           />
         </Form.FormItem>
-        <Space breakLine>
+        <Space breakLine className="settings-section">
           <Button type="submit" loading={saving}>
             Save account
           </Button>
@@ -569,12 +563,7 @@ export function SettingsPage() {
   return (
     <>
       <div className="page-heading">
-        <div>
-          <h1>Settings</h1>
-          <p className="muted">
-            Define currencies, institutions, and the asset types that fit your life.
-          </p>
-        </div>
+        <h1>Settings</h1>
       </div>
       <Tabs value={tab} onChange={(value) => setTab(String(value))}>
         <Tabs.TabPanel value="currencies" label="Currencies">

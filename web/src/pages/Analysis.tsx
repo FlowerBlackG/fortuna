@@ -33,11 +33,11 @@ export function AnalysisPage() {
   const [selected, setSelected] = useState<string[] | null>(null);
   const available = (state.data?.reports || [])
     .filter((report) => {
-      const date = new Date(report.create_time);
+      const date = new Date(report.report_time);
       const local = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       return (!from || local >= from) && (!through || local <= through);
     })
-    .sort((a, b) => a.create_time.localeCompare(b.create_time));
+    .sort((a, b) => Date.parse(a.report_time) - Date.parse(b.report_time));
   const reports = available.filter(
     (report) => selected === null || selected.includes(report.report_id),
   );
@@ -99,7 +99,7 @@ export function AnalysisPage() {
         connectNulls: false,
         symbolSize: 7,
         data: points.map((point) => [
-          Date.parse(point.report.create_time),
+          Date.parse(point.report.report_time),
           point.missing ? null : point.groups.values.get(id) || 0,
         ]),
       })),
@@ -112,7 +112,7 @@ export function AnalysisPage() {
         itemStyle: { color: "#24352f" },
         lineStyle: { width: 2, type: "dashed" },
         data: points.map((point) => [
-          Date.parse(point.report.create_time),
+          Date.parse(point.report.report_time),
           point.missing ? null : point.amounts.get(currency)?.effective || 0,
         ]),
       },
@@ -129,12 +129,7 @@ export function AnalysisPage() {
   return (
     <div className="stack">
       <div className="page-heading">
-        <div>
-          <h1>Across your reports</h1>
-          <p className="muted">
-            See how your assets change over time, valued using each report’s saved exchange rates.
-          </p>
-        </div>
+        <h1>Across your reports</h1>
         <Button
           variant="outline"
           icon={<RefreshIcon />}
@@ -225,10 +220,7 @@ export function AnalysisPage() {
           />
         </Loading>
         <Space>
-          <span className="muted">
-            {reports.length} reports · Horizontal spacing reflects elapsed time · Values are report
-            snapshots. Colored areas show asset types; the dashed line shows the total.
-          </span>
+          <span className="muted">{reports.length} reports · Dashed line: total</span>
         </Space>
       </Card>
       <Card title="Report values">
@@ -237,14 +229,14 @@ export function AnalysisPage() {
           data={points.map((point) => ({
             report_id: point.report.report_id,
             title: reportTitle(point.report),
-            date: point.report.create_time,
+            date: point.report.report_time,
             values: point,
           }))}
           columns={[
             { colKey: "title", title: "Report" },
             {
               colKey: "date",
-              title: "Created",
+              title: "Report time",
               cell: ({ row }) => new Date(row.date).toLocaleString(),
             },
             {

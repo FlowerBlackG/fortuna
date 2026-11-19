@@ -107,8 +107,8 @@ export function number(value: number, decimals: number) {
       })
     : "Invalid value";
 }
-export function reportTitle(report: { title: string; create_time: string }) {
-  return report.title.trim() || new Date(report.create_time).toLocaleString();
+export function reportTitle(report: { title: string; report_time: string }) {
+  return report.title.trim() || new Date(report.report_time).toLocaleString();
 }
 
 export function chartCurrency(metadata: Metadata, selected = ""): string {

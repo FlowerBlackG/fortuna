@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: MulanPSL-2.0
+import builtins
 from dataclasses import asdict, dataclass, fields
+from sqlite3 import Connection
 from typing import ClassVar
 
 
@@ -80,6 +82,7 @@ class Report(Entity):
     title: str
     create_time: str
     update_time: str
+    report_time: str
 
 
 @dataclass
@@ -106,48 +109,51 @@ class SystemInfo(Entity):
     fortuna_server_version_code: int
 
 
-class Repository:
-    def __init__(self, connection, entity_type):
+class Repository[T: Entity]:
+    def __init__(self, connection: Connection, entity_type: type[T]) -> None:
+        if entity_type not in (UserAccount, UserSettings, Currency, CurrencyExchangeRate,
+                               Institution, AssetType, Report, ReportRecord, SystemInfo):
+            raise ValueError("Unknown entity type")
         self.connection = connection
         self.entity_type = entity_type
-        self.columns = {field.name for field in fields(entity_type)}
+        self.columns = tuple(field.name for field in fields(entity_type))
         self.table = entity_type.table
 
-    def _where(self, filters):
-        if not filters.keys() <= self.columns:
+    def _where(self, filters: dict[str, str]) -> str:
+        if filters.keys() - self.columns:
             raise ValueError("Unknown entity field")
-        return " AND ".join(f"{key} = ?" for key in filters) or "1 = 1"
+        return " AND ".join(f"{col} = :{col}" for col in self.columns if col in filters) or "1 = 1"
 
-    def list(self, **filters):
+    def list(self, **filters: str) -> builtins.list[T]:
         rows = self.connection.execute(
-            f"SELECT * FROM {self.table} WHERE {self._where(filters)}", tuple(filters.values())
+            f"SELECT * FROM {self.table} WHERE {self._where(filters)}", filters
         )
         return [self.entity_type(**dict(row)) for row in rows]
 
-    def get(self, **filters):
+    def get(self, **filters: str) -> T | None:
         rows = self.list(**filters)
         return rows[0] if rows else None
 
-    def insert(self, entity):
-        data = asdict(entity)
+    def insert(self, entity: T) -> T:
+        columns = ", ".join(self.columns)
+        bindings = ", ".join(f":{col}" for col in self.columns)
         self.connection.execute(
-            f"INSERT INTO {self.table} ({', '.join(data)}) VALUES ({', '.join('?' for _ in data)})",
-            tuple(data.values()),
+            f"INSERT INTO {self.table} ({columns}) VALUES ({bindings})", asdict(entity)
         )
         return entity
 
-    def update(self, entity):
-        data = asdict(entity)
-        keys = {key: data.pop(key) for key in self.entity_type.keys}
+    def update(self, entity: T) -> T:
+        keys = self.entity_type.keys
+        assignments = ", ".join(f"{col} = :{col}" for col in self.columns if col not in keys)
+        where = " AND ".join(f"{col} = :{col}" for col in keys)
         self.connection.execute(
-            f"UPDATE {self.table} SET {', '.join(f'{key} = ?' for key in data)} WHERE {self._where(keys)}",
-            (*data.values(), *keys.values()),
+            f"UPDATE {self.table} SET {assignments} WHERE {where}", asdict(entity)
         )
         return entity
 
-    def delete(self, **filters):
+    def delete(self, **filters: str) -> None:
         if not filters:
             raise ValueError("Deletion requires a filter")
         self.connection.execute(
-            f"DELETE FROM {self.table} WHERE {self._where(filters)}", tuple(filters.values())
+            f"DELETE FROM {self.table} WHERE {self._where(filters)}", filters
         )

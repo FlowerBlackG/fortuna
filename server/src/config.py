@@ -3,11 +3,12 @@ import json
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, Self
 
 from jsonschema import Draft202012Validator
 
 
-def decode(value, schema, directory):
+def decode(value: Any, schema: dict[str, Any], directory: Path) -> Any:
     if value is None:
         return None
     if "oneOf" in schema:
@@ -30,11 +31,11 @@ def decode(value, schema, directory):
 
 class Config(SimpleNamespace):
     @classmethod
-    def load(cls, filename: str):
+    def load(cls, filename: str | Path) -> Self:
         path = Path(filename).resolve()
         schema = json.loads(Path(__file__).with_name("config.schema.json").read_text(encoding="utf-8"))
         data = json.loads(path.read_text(encoding="utf-8"))
-        error = next(Draft202012Validator(schema).iter_errors(data), None)
+        error = next(iter(Draft202012Validator(schema).iter_errors(data)), None)
         if error:
             location = ".".join(map(str, error.absolute_path)) or "config"
             raise ValueError(f"{location}: {error.message}")

@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   DatePicker,
-  Dialog,
   Form,
   Input,
   InputNumber,
@@ -18,6 +17,7 @@ import {
 } from "tdesign-react";
 import type { PrimaryTableCol } from "tdesign-react";
 import { DeleteIcon } from "tdesign-icons-react";
+import { EditorDialog, EditorField } from "./Editor";
 import {
   conversion,
   customFields,
@@ -196,7 +196,6 @@ export function ValuationControls({
           if (typeof value === "number") setDecimals(Math.min(10, Math.max(0, Math.round(value))));
         }}
       />
-      <span className="muted">Each report’s saved exchange rates</span>
     </div>
   );
 }
@@ -519,20 +518,18 @@ export function RecordEditor({
     close();
   }
   return (
-    <Dialog
-      visible
-      width={720}
-      header={initial ? "Edit record" : "Add record"}
-      confirmBtn="Save record"
-      onConfirm={save}
+    <EditorDialog
+      title={initial ? "Edit record" : "Add record"}
+      saveLabel="Save record"
+      onSave={save}
       onClose={close}
-      closeOnOverlayClick={false}
     >
       {error && <Alert theme="error" message={error} />}
       <Form labelAlign="top">
         <div className="form-grid">
-          <Form.FormItem label="Asset type">
+          <EditorField label="Asset type">
             <Select
+              autofocus
               filterable
               value={draft.asset_type_id}
               options={metadata.asset_types.map((item) => ({
@@ -541,8 +538,8 @@ export function RecordEditor({
               }))}
               onChange={(value) => chooseType(selectString(value))}
             />
-          </Form.FormItem>
-          <Form.FormItem label="Institution">
+          </EditorField>
+          <EditorField label="Institution">
             <Select
               filterable
               value={draft.institution_id}
@@ -552,8 +549,8 @@ export function RecordEditor({
               }))}
               onChange={(value) => update({ institution_id: selectString(value) })}
             />
-          </Form.FormItem>
-          <Form.FormItem label="Currency">
+          </EditorField>
+          <EditorField label="Currency">
             <Select
               filterable
               value={draft.currency_id}
@@ -563,28 +560,28 @@ export function RecordEditor({
               }))}
               onChange={(value) => update({ currency_id: selectString(value) })}
             />
-          </Form.FormItem>
-          <Form.FormItem label="Amount">
+          </EditorField>
+          <EditorField label="Amount">
             <InputNumber
               value={draft.amount}
               onChange={(value) => update({ amount: typeof value === "number" ? value : NaN })}
             />
-          </Form.FormItem>
-          <Form.FormItem label="Effective rate">
+          </EditorField>
+          <EditorField label="Effective rate">
             <InputNumber
               value={draft.effective_rate}
               onChange={(value) =>
                 update({ effective_rate: typeof value === "number" ? value : NaN })
               }
             />
-          </Form.FormItem>
-          <Form.FormItem label="Content" className="wide">
+          </EditorField>
+          <EditorField label="Content" className="wide">
             <Textarea
               value={draft.content}
               onChange={(content) => update({ content })}
               autosize={{ minRows: 2, maxRows: 6 }}
             />
-          </Form.FormItem>
+          </EditorField>
           {[...fields]
             .sort((a, b) => a.display_order - b.display_order)
             .map((field) => {
@@ -596,7 +593,7 @@ export function RecordEditor({
                 update({ asset_custom_fields_data: copy });
               }
               return (
-                <Form.FormItem
+                <EditorField
                   key={field.data_order}
                   label={`${field.field_name}${field.nullable ? " (optional)" : " *"}`}
                   help={`${field.prefix}${field.postfix ? ` … ${field.postfix}` : ""}`}
@@ -624,11 +621,11 @@ export function RecordEditor({
                       onChange={(number) => change(typeof number === "number" ? number : null)}
                     />
                   )}
-                </Form.FormItem>
+                </EditorField>
               );
             })}
         </div>
       </Form>
-    </Dialog>
+    </EditorDialog>
   );
 }
