@@ -155,6 +155,7 @@ export function ReportExchangeRates({
                     cell: ({ row }: { row: ExchangeRate }) => (
                       <Space>
                         <Button
+                          shape="round"
                           variant="text"
                           icon={<EditIcon />}
                           aria-label={t("Edit")}
@@ -167,6 +168,7 @@ export function ReportExchangeRates({
                           onConfirm={() => void remove(row)}
                         >
                           <Button
+                            shape="round"
                             variant="text"
                             theme="danger"
                             icon={<DeleteIcon />}
@@ -192,7 +194,7 @@ export function ReportExchangeRates({
               if (!busy) setEditing(undefined);
             }}
             onConfirm={() => void save()}
-            confirmBtn={{ content: t("Save"), loading: busy }}
+            confirmBtn={{ shape: "round", content: t("Save"), loading: busy }}
             closeOnOverlayClick={false}
           >
             {error && <Alert theme="error" message={error} />}

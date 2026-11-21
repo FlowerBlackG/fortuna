@@ -57,6 +57,7 @@ function WorkspaceMenu() {
         operations={
           <Space direction={collapsed ? "vertical" : "horizontal"} size="small">
             <Button
+              shape="round"
               variant="text"
               icon={collapsed ? <MenuUnfoldIcon /> : <MenuFoldIcon />}
               aria-expanded={!collapsed}
@@ -65,6 +66,7 @@ function WorkspaceMenu() {
               onClick={() => setCollapsed(!collapsed)}
             />
             <Button
+              shape="round"
               variant="text"
               icon={<ServerIcon />}
               aria-label={t("Server")}
@@ -72,6 +74,7 @@ function WorkspaceMenu() {
               onClick={() => navigate("/server")}
             />
             <Button
+              shape="round"
               variant="text"
               icon={<LogoutIcon />}
               aria-label={t("Log out")}
@@ -116,6 +119,7 @@ function Workspace({ serverVersion }: { serverVersion: BuildInfo }) {
               message={error}
               operation={
                 <Button
+                  shape="round"
                   variant="text"
                   onClick={() => {
                     void refresh().catch(() => {});

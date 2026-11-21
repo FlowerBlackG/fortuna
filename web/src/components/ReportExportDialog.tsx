@@ -30,7 +30,7 @@ export function ReportExportDialog({ input, close }: { input: ReportExport; clos
       className="editor-dialog"
       header={t("Export report")}
       placement="center"
-      confirmBtn={{ content: t("Export"), loading: busy }}
+      confirmBtn={{ shape: "round", content: t("Export"), loading: busy }}
       onConfirm={() => void download()}
       onClose={() => {
         if (!busy) close();

@@ -40,11 +40,11 @@ export function ServerPage({
             <Input value={address} onChange={setAddress} placeholder="http://localhost:5000" />
           </Form.FormItem>
           <Space>
-            <Button type="submit" loading={loading}>
+            <Button shape="round" type="submit" loading={loading}>
               {t("Test & connect")}
             </Button>
             {serverAddress() && (
-              <Button variant="outline" onClick={() => navigate("/reports")}>
+              <Button shape="round" variant="outline" onClick={() => navigate("/reports")}>
                 {t("Back")}
               </Button>
             )}
@@ -129,11 +129,17 @@ export function AuthPage() {
               />
             </Form.FormItem>
           )}
-          <Button block type="submit" loading={loading}>
+          <Button shape="round" block type="submit" loading={loading}>
             {mode === "login" ? t("Log in") : t("Create account")}
           </Button>
         </Form>
-        <Button variant="text" icon={<ServerIcon />} block onClick={() => navigate("/server")}>
+        <Button
+          shape="round"
+          variant="text"
+          icon={<ServerIcon />}
+          block
+          onClick={() => navigate("/server")}
+        >
           {t("Server")}: {serverAddress()}
         </Button>
       </Card>

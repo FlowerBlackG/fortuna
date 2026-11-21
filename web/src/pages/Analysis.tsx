@@ -153,13 +153,14 @@ export function AnalysisPage() {
             value={through}
             onChange={(value) => setThrough(String(value || ""))}
           />
-          <Button variant="text" onClick={() => selectRange("ytd")}>
+          <Button shape="round" variant="text" onClick={() => selectRange("ytd")}>
             {t("YTD")}
           </Button>
-          <Button variant="text" onClick={() => selectRange("year")}>
+          <Button shape="round" variant="text" onClick={() => selectRange("year")}>
             {t("Last 1 year")}
           </Button>
           <Button
+            shape="round"
             variant="text"
             onClick={() => {
               setFrom("");
@@ -169,6 +170,7 @@ export function AnalysisPage() {
             {t("All time")}
           </Button>
           <Button
+            shape="round"
             variant="outline"
             icon={<RefreshIcon />}
             aria-label={t("Refresh")}
@@ -199,7 +201,7 @@ export function AnalysisPage() {
             }))}
             onChange={(value) => setSelected(value as string[])}
           />
-          <Button variant="text" onClick={() => setSelected(null)}>
+          <Button shape="round" variant="text" onClick={() => setSelected(null)}>
             {t("Select all in date range")}
           </Button>
         </div>

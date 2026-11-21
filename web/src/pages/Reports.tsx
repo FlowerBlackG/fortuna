@@ -66,6 +66,7 @@ function ExportButton({
   return (
     <>
       <Button
+        shape="round"
         variant={compact ? "text" : "outline"}
         icon={<DownloadIcon />}
         aria-label={t("Export report")}
@@ -169,6 +170,7 @@ export function ReportsPage() {
             }
           >
             <Button
+              shape="round"
               theme="danger"
               variant="text"
               icon={<DeleteIcon />}
@@ -216,6 +218,7 @@ export function ReportsPage() {
             onChange={setSearch}
           />
           <Button
+            shape="round"
             variant="outline"
             icon={<RefreshIcon />}
             aria-label={t("Refresh")}
@@ -381,7 +384,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
         theme="error"
         message={state.error}
         operation={
-          <Button variant="text" onClick={() => action(state.refresh)}>
+          <Button shape="round" variant="text" onClick={() => action(state.refresh)}>
             {t("Retry")}
           </Button>
         }
@@ -437,7 +440,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
             />
             <span className="muted">{titleStatus && t(titleStatus)}</span>
             {titleStatus === "Title not saved — click Retry" && (
-              <Button variant="text" onClick={saveTitle}>
+              <Button shape="round" variant="text" onClick={saveTitle}>
                 {t("Retry")}
               </Button>
             )}

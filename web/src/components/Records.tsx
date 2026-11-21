@@ -98,7 +98,7 @@ export function FilterControls({
           value={value.search}
           onChange={(search) => onChange({ ...value, search })}
         />
-        <Button variant="text" onClick={() => onChange(emptyFilters)}>
+        <Button shape="round" variant="text" onClick={() => onChange(emptyFilters)}>
           {t("Clear filters")}
         </Button>
       </div>
@@ -391,6 +391,7 @@ export function RecordTable({
             {status?.error && <span className="muted">{t("Not synced: {0}", status.error)}</span>}
             <Space size="small">
               <Button
+                shape="round"
                 size="small"
                 variant="text"
                 icon={<EditIcon />}
@@ -399,12 +400,13 @@ export function RecordTable({
                 onClick={() => onEdit?.(row)}
               />
               {status?.error && (
-                <Button size="small" variant="text" onClick={() => onRetry?.(row)}>
+                <Button shape="round" size="small" variant="text" onClick={() => onRetry?.(row)}>
                   {t("Retry")}
                 </Button>
               )}
               <Popconfirm content={t("Delete this record?")} onConfirm={() => onDelete?.(row)}>
                 <Button
+                  shape="round"
                   size="small"
                   theme="danger"
                   variant="text"

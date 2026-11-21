@@ -153,6 +153,7 @@ function FieldEditor({
               {t("Allow empty value")}
             </Checkbox>
             <Button
+              shape="round"
               variant="outline"
               size="small"
               disabled={index === 0}
@@ -161,6 +162,7 @@ function FieldEditor({
               {t("Move up")}
             </Button>
             <Button
+              shape="round"
               variant="outline"
               size="small"
               disabled={index === ordered.length - 1}
@@ -169,6 +171,7 @@ function FieldEditor({
               {t("Move down")}
             </Button>
             <Button
+              shape="round"
               variant="text"
               theme="danger"
               size="small"
@@ -183,6 +186,7 @@ function FieldEditor({
         </div>
       ))}
       <Button
+        shape="round"
         className="settings-section"
         variant="outline"
         onClick={() =>
@@ -361,6 +365,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
       cell: ({ row }) => (
         <Space>
           <Button
+            shape="round"
             variant="text"
             size="small"
             icon={<EditIcon />}
@@ -396,6 +401,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
             }
           >
             <Button
+              shape="round"
               variant="text"
               theme="danger"
               size="small"
@@ -475,7 +481,7 @@ function Preferences() {
           theme="warning"
           message={t("Your saved settings are malformed or reference a deleted currency.")}
           operation={
-            <Button variant="text" onClick={() => action(() => save(""))}>
+            <Button shape="round" variant="text" onClick={() => action(() => save(""))}>
               {t("Repair settings")}
             </Button>
           }
@@ -545,6 +551,7 @@ function FontPreferences() {
         )}
       </p>
       <Button
+        shape="round"
         variant="outline"
         onClick={() => {
           for (const role of fontRoles) setFont(role, "");

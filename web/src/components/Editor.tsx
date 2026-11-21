@@ -50,7 +50,7 @@ export function EditorDialog({
       placement="center"
       width={720}
       header={title}
-      confirmBtn={{ content: saveLabel, loading: saving }}
+      confirmBtn={{ shape: "round", content: saveLabel, loading: saving }}
       confirmOnEnter
       closeOnEscKeydown
       closeOnOverlayClick={false}
