@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t, useLanguage, setLanguage } from "../i18n";
+import { defaultFonts, fontRoles, savedFont, setFont, type FontRole } from "../exportFonts";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -25,6 +27,11 @@ import { EditorDialog, EditorField } from "../components/Editor";
 import type { Account, AssetType, Currency, CustomField, Institution, Metadata } from "../types";
 
 type Resource = "currencies" | "institutions" | "asset-types";
+const resourceNames = {
+  currencies: "currency",
+  institutions: "institution",
+  "asset-types": "asset type",
+} as const;
 type MetadataEntry = Currency | Institution | AssetType;
 type MetadataRow = MetadataEntry & { id: string };
 const idFor = (resource: Resource) =>
@@ -94,39 +101,44 @@ function FieldEditor({
   }
   return (
     <div>
-      <h2>Custom fields</h2>
-      <p className="muted">Removing a field deletes its values from existing records.</p>
+      <h2>{t("Custom fields")}</h2>
+      <p className="muted">{t("Removing a field deletes its values from existing records.")}</p>
       {ordered.map((field, index) => (
         <div className="field-row" key={field.data_order}>
           <div className="form-grid">
             <EditorField
-              label="Field name"
-              warning={attempted && !field.field_name.trim() && "Enter a field name"}
+              label={t("Field name")}
+              warning={attempted && !field.field_name.trim() && t("Enter a field name")}
             >
               <Input
                 value={field.field_name}
                 onChange={(field_name) => update(field.data_order, { field_name })}
               />
             </EditorField>
-            <EditorField label="Type">
+            <EditorField label={t("Type")}>
               <Select
                 value={field.type}
                 options={["str", "int", "float", "date"].map((value) => ({
                   value,
-                  label: { str: "Text", int: "Integer", float: "Decimal", date: "Date" }[value],
+                  label: {
+                    str: t("Text"),
+                    int: t("Integer"),
+                    float: t("Decimal"),
+                    date: t("Date"),
+                  }[value],
                 }))}
                 onChange={(value) =>
                   update(field.data_order, { type: value as CustomField["type"] })
                 }
               />
             </EditorField>
-            <EditorField label="Prefix">
+            <EditorField label={t("Prefix")}>
               <Input
                 value={field.prefix}
                 onChange={(prefix) => update(field.data_order, { prefix })}
               />
             </EditorField>
-            <EditorField label="Postfix">
+            <EditorField label={t("Postfix")}>
               <Input
                 value={field.postfix}
                 onChange={(postfix) => update(field.data_order, { postfix })}
@@ -138,7 +150,7 @@ function FieldEditor({
               checked={field.nullable}
               onChange={(nullable) => update(field.data_order, { nullable })}
             >
-              Allow empty value
+              {t("Allow empty value")}
             </Checkbox>
             <Button
               variant="outline"
@@ -146,7 +158,7 @@ function FieldEditor({
               disabled={index === 0}
               onClick={() => move(index, -1)}
             >
-              Move up
+              {t("Move up")}
             </Button>
             <Button
               variant="outline"
@@ -154,15 +166,15 @@ function FieldEditor({
               disabled={index === ordered.length - 1}
               onClick={() => move(index, 1)}
             >
-              Move down
+              {t("Move down")}
             </Button>
             <Button
               variant="text"
               theme="danger"
               size="small"
               icon={<DeleteIcon />}
-              aria-label="Remove field"
-              title="Remove field"
+              aria-label={t("Remove field")}
+              title={t("Remove field")}
               onClick={() =>
                 onChange(fields.filter((item) => item.data_order !== field.data_order))
               }
@@ -190,7 +202,7 @@ function FieldEditor({
           ])
         }
       >
-        Add custom field
+        {t("Add custom field")}
       </Button>
     </div>
   );
@@ -241,7 +253,7 @@ function MetadataEditor({
       update((metadata) => saveEntry(metadata, saved));
       close();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Save failed");
+      setError(reason instanceof Error ? reason.message : t("Save failed"));
     } finally {
       setSaving(false);
       submitting.current = false;
@@ -253,7 +265,7 @@ function MetadataEditor({
       customFields(asset.custom_fields).length !== asset.custom_fields.length);
   return (
     <EditorDialog
-      title={`${initial ? "Edit" : "Add"} ${resource === "asset-types" ? "asset type" : resource === "currencies" ? "currency" : "institution"}`}
+      title={t(`${initial ? "Edit" : "Add"} ${resourceNames[resource]}`)}
       saving={saving}
       onSave={() => void save()}
       onClose={close}
@@ -262,21 +274,23 @@ function MetadataEditor({
       {malformed && (
         <Alert
           theme="warning"
-          message="Some field definitions are malformed. Saving replaces them with the fields shown below; review existing record values afterward."
+          message={t(
+            "Some field definitions are malformed. Saving replaces them with the fields shown below; review existing record values afterward.",
+          )}
         />
       )}
       <Form labelAlign="top">
-        <EditorField label="Name" warning={attempted && !name.trim() && "Enter a name"}>
+        <EditorField label={t("Name")} warning={attempted && !name.trim() && t("Enter a name")}>
           <Input autofocus value={name} onChange={setName} />
         </EditorField>
-        <EditorField label="Note">
+        <EditorField label={t("Note")}>
           <Textarea value={note} onChange={setNote} />
         </EditorField>
         {resource === "asset-types" && (
           <>
             <EditorField
-              label="Color (six hex characters)"
-              warning={attempted && invalidColor && "Use six hexadecimal characters"}
+              label={t("Color (six hex characters)")}
+              warning={attempted && invalidColor && t("Use six hexadecimal characters")}
             >
               <Input
                 value={color}
@@ -311,7 +325,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
   const columns: PrimaryTableCol<MetadataRow>[] = [
     {
       colKey: "name",
-      title: "Name",
+      title: t("Name"),
       cell: ({ row }) => (
         <Space>
           {"color" in row && (
@@ -327,14 +341,14 @@ function MetadataSettings({ resource }: { resource: Resource }) {
     },
     {
       colKey: "note",
-      title: "Note",
+      title: t("Note"),
       cell: ({ row }) => <span className="multiline">{row.note || "—"}</span>,
     },
     ...(resource === "asset-types"
       ? [
           {
             colKey: "fields",
-            title: "Custom fields",
+            title: t("Custom fields"),
             cell: ({ row }: { row: MetadataRow }) =>
               "custom_fields" in row ? customFields(row.custom_fields).length : 0,
           },
@@ -342,7 +356,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
       : []),
     {
       colKey: "actions",
-      title: "Actions",
+      title: t("Actions"),
       width: 180,
       cell: ({ row }) => (
         <Space>
@@ -350,13 +364,13 @@ function MetadataSettings({ resource }: { resource: Resource }) {
             variant="text"
             size="small"
             icon={<EditIcon />}
-            aria-label="Edit"
-            title="Edit"
+            aria-label={t("Edit")}
+            title={t("Edit")}
             disabled={loading}
             onClick={() => open(row.id)}
           />
           <Popconfirm
-            content="Delete this entry? Entries used by records cannot be deleted."
+            content={t("Delete this entry? Entries used by records cannot be deleted.")}
             onConfirm={() =>
               action(async () => {
                 await request("DELETE", `/${resource}/${row.id}`);
@@ -386,8 +400,8 @@ function MetadataSettings({ resource }: { resource: Resource }) {
               theme="danger"
               size="small"
               icon={<DeleteIcon />}
-              aria-label="Delete"
-              title="Delete"
+              aria-label={t("Delete")}
+              title={t("Delete")}
             />
           </Popconfirm>
         </Space>
@@ -398,19 +412,14 @@ function MetadataSettings({ resource }: { resource: Resource }) {
     <Card className="settings-section">
       <div className="toolbar">
         <Button shape="round" disabled={loading} onClick={() => open()}>
-          Add{" "}
-          {resource === "asset-types"
-            ? "asset type"
-            : resource === "currencies"
-              ? "currency"
-              : "institution"}
+          {t(`Add ${resourceNames[resource]}`)}
         </Button>
         <Button
           shape="round"
           variant="outline"
           icon={<RefreshIcon />}
-          aria-label="Refresh"
-          title="Refresh"
+          aria-label={t("Refresh")}
+          title={t("Refresh")}
           loading={loading}
           onClick={() => {
             void refresh().catch(() => {});
@@ -422,7 +431,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
         data={entries(metadata, resource)}
         columns={columns}
         loading={loading}
-        empty="No entries yet. Add your first one above."
+        empty={t("No entries yet. Add your first one above.")}
         pagination={{ total: entries(metadata, resource).length, defaultPageSize: 20 }}
       />
       {editing !== undefined && (
@@ -433,6 +442,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
 }
 
 function Preferences() {
+  const language = useLanguage();
   const { metadata, update, loading } = useMetadata();
   const [saving, setSaving] = useState(false);
   const settings = settingsObject(metadata.settings);
@@ -459,20 +469,30 @@ function Preferences() {
     }
   }
   return (
-    <Card title="Display preferences" className="settings-section">
+    <Card title={t("Display preferences")} className="settings-section">
       {malformed && (
         <Alert
           theme="warning"
-          message="Your saved settings are malformed or reference a deleted currency."
+          message={t("Your saved settings are malformed or reference a deleted currency.")}
           operation={
             <Button variant="text" onClick={() => action(() => save(""))}>
-              Repair settings
+              {t("Repair settings")}
             </Button>
           }
         />
       )}
       <Form labelAlign="top">
-        <Form.FormItem label="Default currency">
+        <EditorField label={t("Language")}>
+          <Select
+            value={language}
+            options={[
+              { value: "en-US", label: "English" },
+              { value: "zh-CN", label: "简体中文" },
+            ]}
+            onChange={(value) => setLanguage(value === "zh-CN" ? "zh-CN" : "en-US")}
+          />
+        </EditorField>
+        <Form.FormItem label={t("Default currency")}>
           <Select
             clearable
             disabled={loading || saving}
@@ -486,9 +506,53 @@ function Preferences() {
         </Form.FormItem>
       </Form>
       <p className="muted">
-        Decimal precision is adjustable on report and analysis pages and is saved only in this
-        browser.
+        {t(
+          "Decimal precision is adjustable on report and analysis pages and is saved only in this browser.",
+        )}
       </p>
+    </Card>
+  );
+}
+
+function FontPreferences() {
+  const [names, setNames] = useState(() =>
+    Object.fromEntries(fontRoles.map((role) => [role, savedFont(role)])),
+  );
+  function change(role: FontRole, name: string) {
+    setFont(role, name);
+    setNames((previous) => ({ ...previous, [role]: name }));
+  }
+  return (
+    <Card title={t("Excel export fonts")} className="settings-section">
+      <Form labelAlign="top">
+        <div className="form-grid">
+          {fontRoles.map((role) => (
+            <EditorField key={role} label={t(role)}>
+              <Input
+                clearable
+                maxlength={31}
+                value={names[role] ?? ""}
+                placeholder={defaultFonts[role]}
+                onChange={(value) => change(role, value)}
+              />
+            </EditorField>
+          ))}
+        </div>
+      </Form>
+      <p className="muted">
+        {t(
+          "Font names must be installed on the computer opening the workbook. Monospace fonts are used for amounts, dates and currency codes.",
+        )}
+      </p>
+      <Button
+        variant="outline"
+        onClick={() => {
+          for (const role of fontRoles) setFont(role, "");
+          setNames({});
+        }}
+      >
+        {t("Restore defaults")}
+      </Button>
     </Card>
   );
 }
@@ -517,13 +581,13 @@ function AccountSettings() {
     }
   }
   return (
-    <Card title="Account" className="settings-section">
+    <Card title={t("Account")} className="settings-section">
       {state.error && <Alert theme="error" message={state.error} />}
       <Form labelAlign="top" onSubmit={() => action(save)}>
-        <Form.FormItem label="Username">
+        <Form.FormItem label={t("Username")}>
           <Input value={username} onChange={setUsername} />
         </Form.FormItem>
-        <Form.FormItem label="Current password">
+        <Form.FormItem label={t("Current password")}>
           <Input
             type="password"
             value={password}
@@ -531,7 +595,7 @@ function AccountSettings() {
             autocomplete="current-password"
           />
         </Form.FormItem>
-        <Form.FormItem label="New password (optional)">
+        <Form.FormItem label={t("New password (optional)")}>
           <Input
             type="password"
             value={newPassword}
@@ -541,15 +605,17 @@ function AccountSettings() {
         </Form.FormItem>
         <Space breakLine className="settings-section">
           <Button type="submit" loading={saving} shape="round">
-            Save account
+            {t("Save account")}
           </Button>
           <Popconfirm
-            content="Permanently delete your account and all reports, records, and settings? Enter your current password above first."
+            content={t(
+              "Permanently delete your account and all reports, records, and settings? Enter your current password above first.",
+            )}
             confirmBtn={
               <Button
                 shape="round"
                 theme="danger"
-                content="Delete"
+                content={t("Delete")}
                 size="small"
                 onClick={() => {
                   void request("DELETE", "/account", { password })
@@ -558,14 +624,14 @@ function AccountSettings() {
                 }}
               />
             }
-            cancelBtn={<Button shape="round" size="small" content="Cancel" theme="default" />}
+            cancelBtn={<Button shape="round" size="small" content={t("Cancel")} theme="default" />}
           >
             <Button
               theme="danger"
               shape="round"
-              content="Delete account"
-              aria-label="Delete account"
-              title="Delete account"
+              content={t("Delete account")}
+              aria-label={t("Delete account")}
+              title={t("Delete account")}
             />
           </Popconfirm>
         </Space>
@@ -583,22 +649,27 @@ export function SettingsPage() {
   return (
     <>
       <div className="page-heading">
-        <h1>Settings</h1>
+        <h1>{t("Settings")}</h1>
       </div>
       <Tabs value={tab} onChange={(value) => setTab(String(value))}>
-        <Tabs.TabPanel value="currencies" label="Currencies">
+        <Tabs.TabPanel value="currencies" label={t("Currencies")}>
           {tab === "currencies" && <MetadataSettings resource="currencies" />}
         </Tabs.TabPanel>
-        <Tabs.TabPanel value="institutions" label="Institutions">
+        <Tabs.TabPanel value="institutions" label={t("Institutions")}>
           {tab === "institutions" && <MetadataSettings resource="institutions" />}
         </Tabs.TabPanel>
-        <Tabs.TabPanel value="asset-types" label="Asset types">
+        <Tabs.TabPanel value="asset-types" label={t("Asset types")}>
           {tab === "asset-types" && <MetadataSettings resource="asset-types" />}
         </Tabs.TabPanel>
-        <Tabs.TabPanel value="preferences" label="Preferences">
-          {tab === "preferences" && <Preferences />}
+        <Tabs.TabPanel value="preferences" label={t("Preferences")}>
+          {tab === "preferences" && (
+            <>
+              <Preferences />
+              <FontPreferences />
+            </>
+          )}
         </Tabs.TabPanel>
-        <Tabs.TabPanel value="account" label="Account">
+        <Tabs.TabPanel value="account" label={t("Account")}>
           {tab === "account" && <AccountSettings />}
         </Tabs.TabPanel>
       </Tabs>

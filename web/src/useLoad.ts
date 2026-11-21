@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "./i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useLoad<T>(load: () => Promise<T>, dependencies: unknown[]) {
@@ -25,7 +26,7 @@ export function useLoad<T>(load: () => Promise<T>, dependencies: unknown[]) {
       return result;
     } catch (reason) {
       if (current === generation.current)
-        setError(reason instanceof Error ? reason.message : "Loading failed");
+        setError(reason instanceof Error ? reason.message : t("Loading failed"));
       throw reason;
     } finally {
       if (current === generation.current) setLoading(false);

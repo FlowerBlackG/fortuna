@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import ExcelJS from "exceljs";
+import { unzipSync } from "fflate";
 import { chromium, expect } from "@playwright/test";
 
 const backend = process.env.FORTUNA_API || "http://127.0.0.1:5000";
@@ -68,8 +71,41 @@ try {
   const cny = await api("POST", "/currencies", { name: "CNY" });
   const bank = await api("POST", "/institutions", { name: "Bank" });
   const broker = await api("POST", "/institutions", { name: "Broker" });
-  const cash = await api("POST", "/asset-types", { name: "Cash", color: "65AE73" });
-  const deposit = await api("POST", "/asset-types", { name: "Deposit", color: "5577CC" });
+  const reference = {
+    field_name: "Reference",
+    type: "str",
+    nullable: true,
+    data_order: 7,
+    display_order: 0,
+    prefix: "",
+    postfix: "",
+  };
+  const cash = await api("POST", "/asset-types", {
+    name: "Cash",
+    color: "65AE73",
+    custom_fields: [reference],
+  });
+  const deposit = await api("POST", "/asset-types", {
+    name: "Deposit",
+    color: "5577CC",
+    custom_fields: [
+      reference,
+      {
+        ...reference,
+        field_name: "Yield",
+        data_order: 2,
+        display_order: 1,
+        type: "float",
+        postfix: "%",
+      },
+      ...Array.from({ length: 12 }, (_, i) => ({
+        ...reference,
+        field_name: `Deposit detail ${i + 1}`,
+        data_order: 8 + i,
+        display_order: 2 + i,
+      })),
+    ],
+  });
   await api("PUT", "/settings", { settings: { default_currency: cny.currency_id } });
   const reports = [];
   for (const multiplier of [1, 2]) {
@@ -89,6 +125,7 @@ try {
       asset_type_id: cash.asset_type_id,
       institution_id: bank.institution_id,
       content: "Cash",
+      asset_custom_fields_data: ["cash ref"],
       amount: 6 * multiplier,
       effective_rate: 1,
     });
@@ -98,6 +135,7 @@ try {
       asset_type_id: deposit.asset_type_id,
       institution_id: broker.institution_id,
       content: "Deposit",
+      asset_custom_fields_data: [2.5, null],
       amount: 60 * multiplier,
       effective_rate: 0.5,
     });
@@ -219,6 +257,17 @@ try {
   ).toHaveCount(0);
   await expect(rateSection.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
   await rateSection.getByRole("cell", { name: "USD / CNY", exact: true }).waitFor();
+  await expect(
+    page.getByRole("columnheader", { name: "Effective value", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: /^(Amount|Effective rate)$/ })).toHaveCount(
+    2,
+  );
+  await expect(
+    page.getByRole("columnheader", { name: "Deposit · Yield", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Reference", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("cell", { name: "2.5%", exact: true })).toBeVisible();
   await page.getByRole("switch").click();
   await expect(page.locator(".chart canvas")).toHaveCount(2);
   await expect
@@ -369,6 +418,126 @@ try {
     .toEqual([null, 156]);
   const newReport = await api("POST", "/reports", {});
   assert.deepEqual(newReport.exchange_rates, []);
+  const institution = "Bank with a long legend label\n上海分行";
+  await api("PATCH", `/institutions/${bank.institution_id}`, { name: institution });
+  await api("PATCH", `/currencies/${usd.currency_id}`, { name: "USD美元" });
+  await nav.getByRole("link", { name: "Settings" }).click();
+  await page.getByText("Preferences", { exact: true }).click();
+  await formItem(page, /^Language$/)
+    .locator(".t-select")
+    .click();
+  await page.locator(".t-select-option").getByText("简体中文").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  for (const [label, font] of [
+    ["英文", "Latin Text"],
+    ["非英文", "CJK Text"],
+    ["英文等宽", "Latin Mono"],
+    ["非英文等宽", "CJK Mono"],
+  ]) {
+    await formItem(page, new RegExp(`^${label}$`))
+      .locator("input")
+      .fill(font);
+  }
+  await page.reload();
+  const zhNav = page.getByRole("navigation", { name: "工作区" });
+  await zhNav.getByRole("link", { name: "分析" }).click();
+  await page.getByText("机构", { exact: true }).click();
+  const plot = page.getByRole("img", { name: "按机构堆叠的资产有效价值趋势" });
+  await plot.locator("canvas").waitFor();
+  const legend = await plot.evaluate(async (el) => {
+    const { getInstanceByDom } = await import("/node_modules/.vite/deps/echarts_core.js");
+    const chart = getInstanceByDom(el);
+    const label = chart
+      .getZr()
+      .storage.getDisplayList()
+      .find((s) => s.type === "tspan" && s.style.text?.startsWith("Bank"));
+    const rect = label.getBoundingRect().clone();
+    rect.applyTransform(label.getComputedTransform());
+    return { text: label.style.text, x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  });
+  assert.match(legend.text, /\.\.\.$/);
+  await plot.hover({ position: { x: legend.x, y: legend.y } });
+  await expect(page.locator(".analysis-tooltip:visible")).toHaveText(institution);
+  await zhNav.getByRole("link", { name: "报告", exact: true }).click();
+  const depositRecord = (await api("GET", `/records?report_id=${reports[1].report_id}`)).find(
+    (r) => r.content === "Deposit",
+  );
+  await api("PATCH", `/records/${depositRecord.record_id}`, {
+    institution_id: bank.institution_id,
+  });
+  await page
+    .getByRole("row")
+    .filter({ has: page.getByRole("link", { name: "Snapshot 2" }) })
+    .getByRole("button", { name: "导出报告" })
+    .click();
+  const exportDialog = page.locator(".t-dialog:visible");
+  const cashField = formItem(exportDialog, /^Cash$/).getByRole("checkbox", { name: "Reference" });
+  await expect(cashField).toBeChecked();
+  await expect(
+    formItem(exportDialog, /^Deposit$/).getByRole("checkbox", { name: "Reference" }),
+  ).toBeChecked();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    exportDialog.getByRole("button", { name: "导出", exact: true }).click(),
+  ]);
+  const archive = unzipSync(await readFile(await download.path()));
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(archive["Snapshot 2.xlsx"]);
+  assert.deepEqual(
+    book.worksheets.map((sheet) => sheet.name),
+    ["按机构", "按资产类型", "按货币"],
+  );
+  for (const sheet of book.worksheets) {
+    assert.equal(sheet.getCell("A1").font.name, "Latin Text");
+    assert.equal(sheet.getCell("A2").font.name, "CJK Text");
+    const rows = sheet.getRows(1, sheet.rowCount);
+    const summary = rows.find((r) => r.getCell(2).text === "有效价值");
+    assert.deepEqual(summary.values.slice(1), ["货币", "有效价值"]);
+    assert.deepEqual(sheet.getRow(summary.number + 1).values.slice(1), ["CNY", 156]);
+    const details = rows.find((r) => r.getCell(1).text === "内容");
+    assert.deepEqual(
+      [4, 5, 6].map((col) => details.getCell(col).text),
+      ["金额", "有效系数", "有效价值"],
+    );
+    assert.ok(!details.values.includes("以CNY计的有效价值"));
+    const referenceCol = details.values.indexOf("Reference");
+    assert.ok(referenceCol > 0);
+    assert.equal(details.values.filter((name) => String(name).includes("Reference")).length, 1);
+    const item = rows.find((r) => r.getCell(1).text === "Cash" && r.getCell(4).value === 12);
+    assert.equal(item.getCell(4).font.name, "Latin Mono");
+    assert.equal(item.getCell(5).value, 1);
+    assert.equal(item.getCell(6).text, "12.00 USD美元 (96.00 CNY)");
+    assert.ok(item.values.includes("cash ref"));
+    assert.equal(item.getCell(referenceCol).text, "cash ref");
+    const deposit = rows.find((r) => r.getCell(1).text === "Deposit" && !r.getCell(1).isMerged);
+    assert.deepEqual(
+      [4, 5, 6].map((i) => deposit.getCell(i).value),
+      [120, 0.5, 60],
+    );
+    assert.ok(deposit.values.includes("2.5%"));
+    assert.equal(deposit.getCell(referenceCol).text, "—");
+    const subtotals = rows
+      .filter((r) => r.getCell(1).text === "小计（CNY）")
+      .map((r) => r.getCell(6).value)
+      .sort((a, b) => a - b);
+    assert.deepEqual(subtotals, sheet.name === "按机构" ? [156] : [60, 96]);
+  }
+  const cashRow = book.worksheets[0]
+    .getRows(1, book.worksheets[0].rowCount)
+    .find((r) => r.getCell(4).value === 12);
+  assert.deepEqual(
+    cashRow.getCell(3).value.richText.map((r) => [r.text, r.font.name]),
+    [
+      ["USD", "Latin Mono"],
+      ["美元", "CJK Mono"],
+    ],
+  );
+  const pdf = Buffer.from(archive["Snapshot 2.pdf"]).toString("latin1");
+  const pages = [...pdf.matchAll(/\/MediaBox\s*\[0 0 ([\d.]+) ([\d.]+)\]/g)];
+  assert.equal(pages.length, 3);
+  assert.equal(new Set(pages.map(([box]) => box)).size, 1);
+  assert.ok(Number(pages[0][1]) > 842);
+  assert.match(pdf, /\/PageMode \/UseOutlines/);
   assert.deepEqual(errors, []);
   assert.deepEqual(await page.evaluate(() => window.fortunaErrors), []);
   console.log(

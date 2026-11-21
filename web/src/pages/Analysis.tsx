@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { getLanguage, t } from "../i18n";
 import { useState } from "react";
 import {
   Alert,
@@ -36,7 +37,7 @@ const grouping = {
   asset_type_id: "Asset type",
   institution_id: "Institution",
   currency_id: "Currency",
-};
+} as const;
 
 export function AnalysisPage() {
   const { metadata, refresh, ensure } = useMetadata();
@@ -85,11 +86,11 @@ export function AnalysisPage() {
       title: reportTitle(report),
       time: Date.parse(report.report_time),
       values,
-      total: missing ? null : (result.amounts.get(currency)?.effective ?? 0),
+      total: missing ? null : (result.amounts.get(currency) ?? 0),
     };
   });
   const missing = points.reduce((count, point) => count + point.missing, 0);
-  const groupLabel = grouping[groupBy].toLowerCase();
+  const groupLabel = t(grouping[groupBy]).toLowerCase();
   const ids = new Set(points.flatMap((p) => [...p.values.keys()]));
   const labels = new Map<string, { name: string; color?: string }>(
     groupBy === "asset_type_id"
@@ -102,7 +103,15 @@ export function AnalysisPage() {
     const item = labels.get(id);
     return {
       id,
-      name: item?.name || `Missing ${groupLabel}`,
+      name:
+        item?.name ||
+        t(
+          groupBy === "asset_type_id"
+            ? "Missing asset type"
+            : groupBy === "institution_id"
+              ? "Missing institution"
+              : "Missing currency",
+        ),
       color:
         item?.color && /^[0-9a-f]{6}$/i.test(item.color)
           ? `#${item.color}`
@@ -134,21 +143,21 @@ export function AnalysisPage() {
         <div className="toolbar">
           <DatePicker
             clearable
-            placeholder="From date"
+            placeholder={t("From date")}
             value={from}
             onChange={(value) => setFrom(String(value || ""))}
           />
           <DatePicker
             clearable
-            placeholder="Through date"
+            placeholder={t("Through date")}
             value={through}
             onChange={(value) => setThrough(String(value || ""))}
           />
           <Button variant="text" onClick={() => selectRange("ytd")}>
-            YTD
+            {t("YTD")}
           </Button>
           <Button variant="text" onClick={() => selectRange("year")}>
-            Last 1 year
+            {t("Last 1 year")}
           </Button>
           <Button
             variant="text"
@@ -157,13 +166,13 @@ export function AnalysisPage() {
               setThrough("");
             }}
           >
-            All time
+            {t("All time")}
           </Button>
           <Button
             variant="outline"
             icon={<RefreshIcon />}
-            aria-label="Refresh"
-            title="Refresh"
+            aria-label={t("Refresh")}
+            title={t("Refresh")}
             loading={state.loading}
             onClick={() => {
               void state.refresh().catch(() => {});
@@ -178,7 +187,7 @@ export function AnalysisPage() {
             clearable
             minCollapsedNum={3}
             style={{ width: "min(700px, 100%)" }}
-            placeholder="Choose reports"
+            placeholder={t("Choose reports")}
             value={
               selected === null
                 ? available.map((report) => report.report_id)
@@ -191,7 +200,7 @@ export function AnalysisPage() {
             onChange={(value) => setSelected(value as string[])}
           />
           <Button variant="text" onClick={() => setSelected(null)}>
-            Select all in date range
+            {t("Select all in date range")}
           </Button>
         </div>
         <ValuationControls
@@ -203,35 +212,38 @@ export function AnalysisPage() {
         />
         <FilterControls value={filters} onChange={setFilters} />
         <div className="toolbar">
-          <span>Group by</span>
+          <span>{t("Group by")}</span>
           <Radio.Group
-            aria-label="Group charts by"
+            aria-label={t("Group charts by")}
             variant="default-filled"
             value={groupBy}
             onChange={(value) => setGroupBy(value as GroupBy)}
-            options={Object.entries(grouping).map(([value, label]) => ({ value, label }))}
+            options={Object.entries(grouping).map(([value, label]) => ({ value, label: t(label) }))}
           />
         </div>
         {from && through && from > through && (
-          <Alert theme="warning" message="The start date is after the end date." />
+          <Alert theme="warning" message={t("The start date is after the end date.")} />
         )}
         {missing > 0 && (
           <Alert
             theme="warning"
-            message={`${missing} record(s) cannot be valued. Affected converted report totals appear as gaps in the chart rather than misleading partial values.`}
+            message={t(
+              "{0} record(s) cannot be valued. Affected converted report totals appear as gaps in the chart rather than misleading partial values.",
+              missing,
+            )}
           />
         )}
         <Loading loading={state.loading}>
           <StackedChart {...chartProps} />
         </Loading>
         <Space>
-          <span className="muted">{reports.length} reports · Dashed line: total</span>
+          <span className="muted">{t("{0} reports · Dashed line: total", reports.length)}</span>
         </Space>
       </Card>
-      <Card title="Report Sankey">
+      <Card title={t("Report Sankey")}>
         <ReportSankey {...chartProps} />
       </Card>
-      <Card title="Report values">
+      <Card title={t("Report values")}>
         <Table
           rowKey="report_id"
           data={points.map((point) => ({
@@ -241,27 +253,27 @@ export function AnalysisPage() {
             values: point,
           }))}
           columns={[
-            { colKey: "title", title: "Report" },
+            { colKey: "title", title: t("Report") },
             {
               colKey: "date",
-              title: "Report time",
-              cell: ({ row }) => new Date(row.date).toLocaleString(),
+              title: t("Report time"),
+              cell: ({ row }) => new Date(row.date).toLocaleString(getLanguage()),
             },
             {
               colKey: "values",
-              title: "Effective value",
+              title: t("Effective value"),
               cell: ({ row }) =>
                 row.values.missing && currency
-                  ? "Incomplete — missing conversion or invalid data"
+                  ? t("Incomplete — missing conversion or invalid data")
                   : [...row.values.amounts]
                       .map(
                         ([id, value]) =>
-                          `${number(value.effective, decimals)} ${metadata.currencies.find((item) => item.currency_id === id)?.name || "Missing currency"}`,
+                          `${number(value, decimals)} ${metadata.currencies.find((item) => item.currency_id === id)?.name || t("Missing currency")}`,
                       )
                       .join(" · ") || "0",
             },
           ]}
-          empty="Choose reports to compare."
+          empty={t("Choose reports to compare.")}
           pagination={{ total: points.length, defaultPageSize: 20 }}
         />
       </Card>

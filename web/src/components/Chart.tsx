@@ -2,6 +2,7 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import * as echarts from "echarts/core";
 import type { EChartsCoreOption } from "echarts/core";
+import { useLanguage } from "../i18n";
 import { LineChart, PieChart, SankeyChart } from "echarts/charts";
 import { LabelLayout } from "echarts/features";
 import {
@@ -36,8 +37,11 @@ export function Chart({
   bindEvents?: (chart: echarts.ECharts) => () => void;
 }) {
   const element = useRef<HTMLDivElement>(null);
+  const language = useLanguage();
   useEffect(() => {
-    const chart = echarts.init(element.current!);
+    const chart = echarts.init(element.current!, undefined, {
+      locale: language === "zh-CN" ? "ZH" : "EN",
+    });
     let frame = 0;
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
@@ -57,7 +61,7 @@ export function Chart({
       cancelAnimationFrame(frame);
       chart.dispose();
     };
-  }, []);
+  }, [language]);
   useEffect(() => {
     const chart = echarts.getInstanceByDom(element.current!)!;
     chart.setOption(option, true);
@@ -65,6 +69,6 @@ export function Chart({
     return () => {
       if (!chart.isDisposed()) unbind?.();
     };
-  }, [option, bindEvents]);
+  }, [option, bindEvents, language]);
   return <div className="chart" style={style} ref={element} role="img" aria-label={label} />;
 }

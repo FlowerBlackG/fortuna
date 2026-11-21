@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "../i18n";
 import { Alert, Card, Empty } from "tdesign-react";
 import { chartCurrency, distribution, number } from "../calculations";
 import { useMetadata } from "../metadata";
@@ -19,7 +20,7 @@ export function ReportDistribution({
   const { metadata } = useMetadata();
   const currency = chartCurrency(metadata, selectedCurrency);
   const currencyName =
-    metadata.currencies.find((item) => item.currency_id === currency)?.name || "No currency";
+    metadata.currencies.find((item) => item.currency_id === currency)?.name || t("No currency");
   return (
     <div className="distribution-grid">
       {(["institution_id", "asset_type_id"] as const).map((group) => {
@@ -32,9 +33,9 @@ export function ReportDistribution({
             return {
               name:
                 group === "asset_type_id"
-                  ? asset?.name || "Missing asset type"
+                  ? asset?.name || t("Missing asset type")
                   : metadata.institutions.find((item) => item.institution_id === id)?.name ||
-                    "Missing institution",
+                    t("Missing institution"),
               value,
               ...(group === "asset_type_id" && asset && /^[0-9A-F]{6}$/.test(asset.color)
                 ? { itemStyle: { color: `#${asset.color}` } }
@@ -42,22 +43,31 @@ export function ReportDistribution({
             };
           });
         const label =
-          group === "asset_type_id" ? "Distribution by asset type" : "Distribution by institution";
+          group === "asset_type_id"
+            ? t("Distribution by asset type")
+            : t("Distribution by institution");
         return (
           <Card title={label} key={group}>
-            <p className="muted">Effective value · {currencyName} · Current filters</p>
+            <p className="muted">
+              {t("Effective value")} · {currencyName} · {t("Current filters")}
+            </p>
             {result.missing ? (
               <Alert
                 theme="warning"
-                message={`${result.missing} record(s) cannot be converted. Configure exchange rates to show a complete distribution.`}
+                message={t(
+                  "{0} record(s) cannot be converted. Configure exchange rates to show a complete distribution.",
+                  result.missing,
+                )}
               />
             ) : negative ? (
               <Alert
                 theme="info"
-                message="This view includes negative group totals, which cannot be represented as pie slices. The record totals include them."
+                message={t(
+                  "This view includes negative group totals, which cannot be represented as pie slices. The record totals include them.",
+                )}
               />
             ) : !data.length ? (
-              <Empty description="No positive values in this view" />
+              <Empty description={t("No positive values in this view")} />
             ) : (
               <Chart
                 label={label}

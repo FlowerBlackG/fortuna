@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "../i18n";
 import { useRef, useState, type ComponentRef, useLayoutEffect } from "react";
 import {
   Alert,
@@ -23,7 +24,7 @@ import { EditorDialog, EditorField } from "./Editor";
 import {
   conversion,
   customFields,
-  customValue,
+  formatEffectiveValue,
   number,
   totals,
   validFieldValue,
@@ -34,6 +35,12 @@ import { emptyFilters } from "../recordState";
 import type { RecordFilters } from "../recordState";
 import type { AssetRecord, CustomField, ExchangeRate } from "../types";
 import { useTableSort } from "../tableState";
+import {
+  reportFields,
+  mergeReportFields,
+  formatReportField,
+  reportFieldValue,
+} from "../reportFields";
 
 export function FilterControls({
   value,
@@ -59,7 +66,7 @@ export function FilterControls({
           inputProps={{ autoWidth: false }}
           clearable
           filterable
-          placeholder="All asset types"
+          placeholder={t("All asset types")}
           value={value.assetTypes}
           options={metadata.asset_types.map((item) => ({
             value: item.asset_type_id,
@@ -74,7 +81,7 @@ export function FilterControls({
           inputProps={{ autoWidth: false }}
           clearable
           filterable
-          placeholder="All institutions"
+          placeholder={t("All institutions")}
           value={value.institutions}
           options={metadata.institutions.map((item) => ({
             value: item.institution_id,
@@ -87,12 +94,12 @@ export function FilterControls({
         <Input
           style={{ width: 240 }}
           clearable
-          placeholder="Search record content"
+          placeholder={t("Search record content")}
           value={value.search}
           onChange={(search) => onChange({ ...value, search })}
         />
         <Button variant="text" onClick={() => onChange(emptyFilters)}>
-          Clear filters
+          {t("Clear filters")}
         </Button>
       </div>
       {!!fields.length && (
@@ -113,7 +120,7 @@ export function FilterControls({
                     <Input
                       style={{ width: 160 }}
                       clearable
-                      placeholder="Contains"
+                      placeholder={t("Contains")}
                       value={filter.text || ""}
                       onChange={(text) => change("text", text)}
                     />
@@ -121,13 +128,13 @@ export function FilterControls({
                     <>
                       <DatePicker
                         clearable
-                        placeholder="From"
+                        placeholder={t("From")}
                         value={filter.min || ""}
                         onChange={(date) => change("min", String(date || ""))}
                       />
                       <DatePicker
                         clearable
-                        placeholder="Through"
+                        placeholder={t("Through")}
                         value={filter.max || ""}
                         onChange={(date) => change("max", String(date || ""))}
                       />
@@ -137,7 +144,7 @@ export function FilterControls({
                       <InputNumber
                         theme="normal"
                         style={{ width: 140 }}
-                        placeholder="Minimum"
+                        placeholder={t("Minimum")}
                         value={filter.min ? Number(filter.min) : undefined}
                         onChange={(number) =>
                           change("min", number === undefined ? "" : String(number))
@@ -146,7 +153,7 @@ export function FilterControls({
                       <InputNumber
                         theme="normal"
                         style={{ width: 140 }}
-                        placeholder="Maximum"
+                        placeholder={t("Maximum")}
                         value={filter.max ? Number(filter.max) : undefined}
                         onChange={(number) =>
                           change("max", number === undefined ? "" : String(number))
@@ -179,16 +186,16 @@ export function ValuationControls({
   const { metadata } = useMetadata();
   return (
     <div className="toolbar">
-      <span>Display in</span>
+      <span>{t("Display in")}</span>
       <Select
         value={currency}
         options={[
-          ...(!singleCurrency ? [{ value: "", label: "Original currencies" }] : []),
+          ...(!singleCurrency ? [{ value: "", label: t("Original currencies") }] : []),
           ...metadata.currencies.map((item) => ({ value: item.currency_id, label: item.name })),
         ]}
         onChange={(value) => setCurrency(selectString(value))}
       />
-      <span>Decimal places</span>
+      <span>{t("Decimal places")}</span>
       <InputNumber
         value={decimals}
         min={0}
@@ -220,7 +227,10 @@ export function RecordTotals({
       {result.missing > 0 && (
         <Alert
           theme="warning"
-          message={`${result.missing} record(s) cannot be valued because of missing conversion paths or invalid values. Totals below are partial.`}
+          message={t(
+            "{0} record(s) cannot be valued because of missing conversion paths or invalid values. Totals below are partial.",
+            result.missing,
+          )}
         />
       )}
       <Space breakLine className="summary-space">
@@ -231,17 +241,19 @@ export function RecordTotals({
             className="summary-card"
             title={
               metadata.currencies.find((item) => item.currency_id === id)?.name ||
-              "Missing currency"
+              t("Missing currency")
             }
           >
-            <div className="muted">Effective value{result.missing ? " (partial)" : ""}</div>
-            <div className="total-number">{number(amount.effective, decimals)}</div>
-            <div className="muted">Nominal {number(amount.nominal, decimals)}</div>
+            <div className="muted">
+              {t("Effective value")}
+              {result.missing ? t(" (partial)") : ""}
+            </div>
+            <div className="total-number">{number(amount, decimals)}</div>
           </Card>
         ))}
         {!result.amounts.size && (
           <Card size="small">
-            {records.length ? "No convertible records" : "No matching records"}
+            {records.length ? t("No convertible records") : t("No matching records")}
           </Card>
         )}
       </Space>
@@ -259,7 +271,6 @@ export function RecordTable({
   rates,
   currency,
   decimals,
-  assetType,
   editable = false,
   statuses = {},
   onEdit,
@@ -270,7 +281,6 @@ export function RecordTable({
   rates: ExchangeRate[];
   currency: string;
   decimals: number;
-  assetType?: string;
   editable?: boolean;
   statuses?: Record<string, RecordStatus>;
   onEdit?: (record: AssetRecord) => void;
@@ -278,48 +288,36 @@ export function RecordTable({
   onRetry?: (record: AssetRecord) => void;
 }) {
   const { metadata } = useMetadata();
-  const fields = customFields(
-    metadata.asset_types.find((item) => item.asset_type_id === assetType)?.custom_fields,
-  );
+  const fields = mergeReportFields(reportFields(records, metadata.asset_types));
   const typeNames = new Map(metadata.asset_types.map((item) => [item.asset_type_id, item.name]));
   const institutionNames = new Map(
     metadata.institutions.map((item) => [item.institution_id, item.name]),
   );
-  const typeName = (row: AssetRecord) => typeNames.get(row.asset_type_id) ?? "Missing asset type";
+  const typeName = (row: AssetRecord) =>
+    typeNames.get(row.asset_type_id) ?? t("Missing asset type");
   const institutionName = (row: AssetRecord) =>
-    institutionNames.get(row.institution_id) ?? "Missing institution";
-  function money(record: AssetRecord, effective: boolean) {
-    const amount = record.amount * (effective ? record.effective_rate : 1);
-    const name =
-      metadata.currencies.find((item) => item.currency_id === record.currency_id)?.name ||
-      "Missing currency";
-    const factor = currency ? conversion(rates, record.currency_id, currency) : null;
-    return (
-      <>
-        <span>
-          {number(amount, decimals)} {name}
-        </span>
-        {currency && currency !== record.currency_id && (
-          <div className="muted">
-            {factor === null
-              ? "No conversion path"
-              : `(${number(amount * factor, decimals)} ${metadata.currencies.find((item) => item.currency_id === currency)?.name || "Missing currency"})`}
-          </div>
-        )}
-      </>
-    );
+    institutionNames.get(row.institution_id) ?? t("Missing institution");
+  const currencyName = (id: string) =>
+    metadata.currencies.find((item) => item.currency_id === id)?.name ?? t("Missing currency");
+  const money = (value: number, id: string) => `${number(value, decimals)} ${currencyName(id)}`;
+  const effective = (row: AssetRecord) => row.amount * row.effective_rate;
+  function valuation(row: AssetRecord) {
+    const factor = currency ? conversion(rates, row.currency_id, currency) : 1;
+    return factor === null ? null : effective(row) * factor;
   }
+  const sortEffective = (a: AssetRecord, b: AssetRecord) =>
+    (valuation(a) ?? 0) - (valuation(b) ?? 0);
   const columns: PrimaryTableCol<AssetRecord>[] = [
     {
       colKey: "content",
-      title: "Content",
+      title: t("Content"),
       minWidth: 180,
       sorter: (a, b) => a.content.localeCompare(b.content),
       cell: ({ row }) => <span className="multiline">{row.content || "—"}</span>,
     },
     {
       colKey: "asset_type_id",
-      title: "Asset type",
+      title: t("Asset type"),
       width: 140,
       sorter: (a, b) => typeName(a).localeCompare(typeName(b)),
       cell: ({ row }) => {
@@ -334,104 +332,85 @@ export function RecordTable({
             {type.name}
           </Space>
         ) : (
-          "Missing asset type"
+          t("Missing asset type")
         );
       },
     },
     {
       colKey: "institution_id",
-      title: "Institution",
+      title: t("Institution"),
       width: 140,
       sorter: (a, b) => institutionName(a).localeCompare(institutionName(b)),
       cell: ({ row }) => institutionName(row),
     },
     {
       colKey: "amount",
-      title: "Nominal amount",
-      width: 175,
+      title: t("Amount"),
+      width: 155,
       sorter: (a, b) => a.amount - b.amount,
-      cell: ({ row }) => money(row, false),
+      cell: ({ row }) => money(row.amount, row.currency_id),
     },
     {
       colKey: "effective_rate",
-      title: "Effective rate",
-      width: 135,
+      title: t("Effective rate"),
+      width: 130,
       sorter: (a, b) => a.effective_rate - b.effective_rate,
     },
     {
       colKey: "effective",
-      title: "Effective value",
-      width: 175,
-      sorter: (a, b) => {
-        const left =
-          a.amount *
-          a.effective_rate *
-          (currency ? (conversion(rates, a.currency_id, currency) ?? 0) : 1);
-        const right =
-          b.amount *
-          b.effective_rate *
-          (currency ? (conversion(rates, b.currency_id, currency) ?? 0) : 1);
-        return left - right;
-      },
-      cell: ({ row }) => money(row, true),
+      title: t("Effective value"),
+      width: currency ? 235 : 175,
+      sorter: sortEffective,
+      cell: ({ row }) => formatEffectiveValue(row, rates, currency, decimals, currencyName),
     },
-    ...[...fields]
-      .sort((a, b) => a.display_order - b.display_order)
-      .map((field): PrimaryTableCol<AssetRecord> => ({
-        colKey: `custom_${field.data_order}`,
-        title: field.field_name,
-        width: 160,
-        sorter: (a, b) => {
-          const left = customValue(a, fields, field);
-          const right = customValue(b, fields, field);
-          return field.type === "int" || field.type === "float"
-            ? Number(left) - Number(right)
-            : displayValue(left).localeCompare(displayValue(right));
-        },
-        cell: ({ row }) => {
-          const value = customValue(row, fields, field);
-          return !validFieldValue(field, value)
-            ? "Needs correction"
-            : value === null
-              ? "—"
-              : `${field.prefix}${displayValue(value)}${field.postfix}`;
-        },
-      })),
+    ...fields.map((column): PrimaryTableCol<AssetRecord> => ({
+      colKey: `custom_${column.key}`,
+      title: column.title,
+      width: 160,
+      sorter: (a, b) => {
+        const left = reportFieldValue(a, column);
+        const right = reportFieldValue(b, column);
+        return column.numeric
+          ? Number(left) - Number(right)
+          : displayValue(left).localeCompare(displayValue(right));
+      },
+      cell: ({ row }) => formatReportField(row, column),
+    })),
   ];
   if (editable)
     columns.push({
       colKey: "actions",
-      title: "Actions / sync",
+      title: t("Actions / sync"),
       width: 200,
       fixed: "right",
       cell: ({ row }) => {
         const status = statuses[row.record_id];
-        if (status?.saving) return <Loading size="small" text="Syncing…" />;
+        if (status?.saving) return <Loading size="small" text={t("Syncing…")} />;
         return (
           <Space direction="vertical" size="small">
-            {status?.error && <span className="muted">Not synced: {status.error}</span>}
+            {status?.error && <span className="muted">{t("Not synced: {0}", status.error)}</span>}
             <Space size="small">
               <Button
                 size="small"
                 variant="text"
                 icon={<EditIcon />}
-                aria-label="Edit"
-                title="Edit"
+                aria-label={t("Edit")}
+                title={t("Edit")}
                 onClick={() => onEdit?.(row)}
               />
               {status?.error && (
                 <Button size="small" variant="text" onClick={() => onRetry?.(row)}>
-                  Retry
+                  {t("Retry")}
                 </Button>
               )}
-              <Popconfirm content="Delete this record?" onConfirm={() => onDelete?.(row)}>
+              <Popconfirm content={t("Delete this record?")} onConfirm={() => onDelete?.(row)}>
                 <Button
                   size="small"
                   theme="danger"
                   variant="text"
                   icon={<DeleteIcon />}
-                  aria-label="Delete"
-                  title="Delete"
+                  aria-label={t("Delete")}
+                  title={t("Delete")}
                 />
               </Popconfirm>
             </Space>
@@ -448,7 +427,7 @@ export function RecordTable({
       tableLayout="auto"
       hover
       pagination={{ total: records.length, defaultPageSize: 20, pageSizeOptions: [20, 50, 100] }}
-      empty="No records match this view."
+      empty={t("No records match this view.")}
     />
   );
 }
@@ -528,7 +507,7 @@ export function RecordEditor({
         ref={(label) => {
           if (label) label.tabIndex = -1;
         }}
-        title={`Keep ${label}`}
+        title={t("Keep {0}", label)}
         checked={kept.has(key)}
         onChange={(checked) => {
           setKept((previous) => {
@@ -545,7 +524,7 @@ export function RecordEditor({
           });
         }}
       >
-        <span className="sr-only">Keep {label}</span>
+        <span className="sr-only">{t("Keep {0}", label)}</span>
       </Checkbox>
     );
   }
@@ -600,8 +579,8 @@ export function RecordEditor({
   }
   return (
     <EditorDialog
-      title={initial ? "Edit record" : "Add record"}
-      saveLabel="Save record"
+      title={initial ? t("Edit record") : t("Add record")}
+      saveLabel={t("Save record")}
       saving={saving}
       onSave={() => void save()}
       onClose={close}
@@ -609,10 +588,10 @@ export function RecordEditor({
       <div inert={saving}>
         {!initial && (
           <label className="toolbar">
-            Quick insert mode
+            {t("Quick insert mode")}
             <Switch
               value={quickInsert}
-              aria-label="Quick insert mode"
+              aria-label={t("Quick insert mode")}
               aria-checked={quickInsert}
               onChange={(value) => setQuickInsert(Boolean(value))}
             />
@@ -620,7 +599,7 @@ export function RecordEditor({
         )}
         <Form labelAlign="top">
           <div className={quickInsert ? "form-grid quick-insert-grid" : "form-grid"}>
-            <EditorField label="Content" className="wide">
+            <EditorField label={t("Content")} className="wide">
               <Textarea
                 ref={contentInput}
                 autofocus
@@ -628,11 +607,11 @@ export function RecordEditor({
                 onChange={(content) => update({ content })}
                 autosize={{ minRows: 2, maxRows: 6 }}
               />
-              {keepBox("content", "content")}
+              {keepBox("content", t("Content").toLowerCase())}
             </EditorField>
             <EditorField
-              label="Asset type"
-              warning={attempted && invalid.type && "Choose an asset type"}
+              label={t("Asset type")}
+              warning={attempted && invalid.type && t("Choose an asset type")}
             >
               <Select
                 popupProps={{ trigger: "focus" }}
@@ -644,11 +623,11 @@ export function RecordEditor({
                 }))}
                 onChange={(value) => chooseType(selectString(value))}
               />
-              {keepBox("asset_type_id", "asset type")}
+              {keepBox("asset_type_id", t("Asset type").toLowerCase())}
             </EditorField>
             <EditorField
-              label="Institution"
-              warning={attempted && invalid.institution && "Choose an institution"}
+              label={t("Institution")}
+              warning={attempted && invalid.institution && t("Choose an institution")}
             >
               <Select
                 filterable
@@ -660,11 +639,11 @@ export function RecordEditor({
                 }))}
                 onChange={(value) => update({ institution_id: selectString(value) })}
               />
-              {keepBox("institution_id", "institution")}
+              {keepBox("institution_id", t("Institution").toLowerCase())}
             </EditorField>
             <EditorField
-              label="Currency"
-              warning={attempted && invalid.currency && "Choose a currency"}
+              label={t("Currency")}
+              warning={attempted && invalid.currency && t("Choose a currency")}
             >
               <Select
                 filterable
@@ -676,18 +655,21 @@ export function RecordEditor({
                 }))}
                 onChange={(value) => update({ currency_id: selectString(value) })}
               />
-              {keepBox("currency_id", "currency")}
+              {keepBox("currency_id", t("Currency").toLowerCase())}
             </EditorField>
-            <EditorField label="Amount" warning={attempted && invalid.amount && "Enter a number"}>
+            <EditorField
+              label={t("Amount")}
+              warning={attempted && invalid.amount && t("Enter a number")}
+            >
               <InputNumber
                 value={invalid.amount ? "" : draft.amount}
                 onChange={(value) => update({ amount: typeof value === "number" ? value : NaN })}
               />
-              {keepBox("amount", "amount")}
+              {keepBox("amount", t("Amount").toLowerCase())}
             </EditorField>
             <EditorField
-              label="Effective rate"
-              warning={attempted && invalid.rate && "Enter a number"}
+              label={t("Effective rate")}
+              warning={attempted && invalid.rate && t("Enter a number")}
             >
               <InputNumber
                 value={invalid.rate ? "" : draft.effective_rate}
@@ -695,7 +677,7 @@ export function RecordEditor({
                   update({ effective_rate: typeof value === "number" ? value : NaN })
                 }
               />
-              {keepBox("effective_rate", "effective rate")}
+              {keepBox("effective_rate", t("Effective rate").toLowerCase())}
             </EditorField>
             {[...fields]
               .sort((a, b) => a.display_order - b.display_order)
@@ -710,8 +692,8 @@ export function RecordEditor({
                 return (
                   <EditorField
                     key={`${draft.asset_type_id}:${field.data_order}`}
-                    label={`${field.field_name}${field.nullable ? " (optional)" : " *"}`}
-                    warning={attempted && invalidCustom[index] && "Enter a valid value"}
+                    label={`${field.field_name}${field.nullable ? t(" (optional)") : " *"}`}
+                    warning={attempted && invalidCustom[index] && t("Enter a valid value")}
                     help={`${field.prefix}${field.postfix ? ` … ${field.postfix}` : ""}`}
                   >
                     {field.type === "str" ? (
@@ -744,7 +726,7 @@ export function RecordEditor({
           </div>
         </Form>
         {quickInsert && (
-          <p className="muted">Check a field to keep its value for the next record.</p>
+          <p className="muted">{t("Check a field to keep its value for the next record.")}</p>
         )}
       </div>
     </EditorDialog>

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { getLanguage, t } from "../i18n";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { v7 as uuidv7 } from "uuid";
@@ -35,6 +36,7 @@ import { emptyFilters, filterRecords, useDefaultCurrency, usePrecision } from ".
 import type { RecordDraft, RecordStatus } from "../components/Records";
 import { useTableSort } from "../tableState";
 import type { ReportExport } from "../reportExport";
+import { ReportExportDialog } from "../components/ReportExportDialog";
 
 const ReportDistribution = lazy(() =>
   import("../components/ReportDistribution").then((module) => ({
@@ -52,30 +54,30 @@ function ExportButton({
   compact?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
-  async function download() {
+  const [input, setInput] = useState<ReportExport>();
+  async function open() {
     setLoading(true);
     try {
-      const [{ downloadReport }, input] = await Promise.all([
-        import("../reportExport"),
-        getInput(),
-      ]);
-      await downloadReport(input);
+      setInput(await getInput());
     } finally {
       setLoading(false);
     }
   }
   return (
-    <Button
-      variant={compact ? "text" : "outline"}
-      icon={<DownloadIcon />}
-      aria-label="Export report"
-      title="Export report"
-      loading={loading}
-      disabled={disabled}
-      onClick={() => action(download)}
-    >
-      {compact ? undefined : "Export"}
-    </Button>
+    <>
+      <Button
+        variant={compact ? "text" : "outline"}
+        icon={<DownloadIcon />}
+        aria-label={t("Export report")}
+        title={t("Export report")}
+        loading={loading}
+        disabled={disabled}
+        onClick={() => action(open)}
+      >
+        {compact ? undefined : t("Export")}
+      </Button>
+      {input && <ReportExportDialog input={input} close={() => setInput(undefined)} />}
+    </>
   );
 }
 
@@ -111,30 +113,30 @@ export function ReportsPage() {
   const columns: PrimaryTableCol<Report>[] = [
     {
       colKey: "title",
-      title: "Report",
+      title: t("Report"),
       sorter: (a, b) => reportTitle(a).localeCompare(reportTitle(b)),
       cell: ({ row }) => <Link to={`/reports/${row.report_id}`}>{reportTitle(row)}</Link>,
     },
     {
       colKey: "report_time",
-      title: "Report time",
+      title: t("Report time"),
       sorter: (a, b) => Date.parse(a.report_time) - Date.parse(b.report_time),
-      cell: ({ row }) => new Date(row.report_time).toLocaleString(),
+      cell: ({ row }) => new Date(row.report_time).toLocaleString(getLanguage()),
     },
     {
       colKey: "create_time",
-      title: "Created",
+      title: t("Created"),
       sorter: (a, b) => a.create_time.localeCompare(b.create_time),
-      cell: ({ row }) => new Date(row.create_time).toLocaleString(),
+      cell: ({ row }) => new Date(row.create_time).toLocaleString(getLanguage()),
     },
     {
       colKey: "update_time",
-      title: "Updated",
-      cell: ({ row }) => new Date(row.update_time).toLocaleString(),
+      title: t("Updated"),
+      cell: ({ row }) => new Date(row.update_time).toLocaleString(getLanguage()),
     },
     {
       colKey: "actions",
-      title: "Actions",
+      title: t("Actions"),
       width: 110,
       cell: ({ row }) => (
         <Space size="small">
@@ -156,7 +158,7 @@ export function ReportsPage() {
             }}
           />
           <Popconfirm
-            content="Delete this report, its records, and its exchange rates?"
+            content={t("Delete this report, its records, and its exchange rates?")}
             onConfirm={() =>
               action(async () => {
                 await request("DELETE", `/reports/${row.report_id}`);
@@ -170,8 +172,8 @@ export function ReportsPage() {
               theme="danger"
               variant="text"
               icon={<DeleteIcon />}
-              aria-label="Delete"
-              title="Delete"
+              aria-label={t("Delete")}
+              title={t("Delete")}
             />
           </Popconfirm>
         </Space>
@@ -181,7 +183,7 @@ export function ReportsPage() {
   if (defaultCurrency)
     columns.splice(1, 0, {
       colKey: "total",
-      title: `Effective total (${defaultCurrency.name})`,
+      title: t("Effective total ({0})", defaultCurrency.name),
       cell: ({ row }) => {
         if (!row.currency_totals) return "—";
         const value = convertTotals(
@@ -190,7 +192,7 @@ export function ReportsPage() {
           defaultCurrency.currency_id,
         );
         return value === null
-          ? "Incomplete — missing conversion"
+          ? t("Incomplete — missing conversion")
           : `${number(value, decimals)} ${defaultCurrency.name}`;
       },
     });
@@ -198,9 +200,9 @@ export function ReportsPage() {
   return (
     <>
       <div className="page-heading">
-        <h1>Reports</h1>
+        <h1>{t("Reports")}</h1>
         <Button loading={creating} shape="round" onClick={() => action(create)}>
-          Create report
+          {t("Create report")}
         </Button>
       </div>
       {state.error && <Alert theme="error" message={state.error} />}
@@ -209,15 +211,15 @@ export function ReportsPage() {
           <Input
             clearable
             style={{ width: 280 }}
-            placeholder="Search reports"
+            placeholder={t("Search reports")}
             value={search}
             onChange={setSearch}
           />
           <Button
             variant="outline"
             icon={<RefreshIcon />}
-            aria-label="Refresh"
-            title="Refresh"
+            aria-label={t("Refresh")}
+            title={t("Refresh")}
             loading={state.loading}
             onClick={() => {
               void state.refresh().catch(() => {});
@@ -230,7 +232,7 @@ export function ReportsPage() {
           {...sorting}
           columns={columns}
           pagination={{ total: rows.length, defaultPageSize: 20 }}
-          empty="No reports yet. Create one to start recording your assets."
+          empty={t("No reports yet. Create one to start recording your assets.")}
         />
       </Card>
     </>
@@ -264,7 +266,9 @@ function ReportDetail({ reportId }: { reportId: string }) {
     return { report, rows };
   }, [reportId]);
   const titleQueue = useRef(Promise.resolve());
-  const [titleStatus, setTitleStatus] = useState("");
+  const [titleStatus, setTitleStatus] = useState<
+    "Saving title…" | "Title saved" | "Title not saved — click Retry"
+  >();
   const [editing, setEditing] = useState<AssetRecord | null | undefined>();
   const [editable, setEditable] = useState(true);
   const [statuses, setStatuses] = useState<Record<string, RecordStatus>>({});
@@ -337,7 +341,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
       );
       setRecords((previous) => previous.map((item) => (item.record_id === id ? saved : item)));
       clearStatus(id);
-      void MessagePlugin.success("Record saved");
+      void MessagePlugin.success(t("Record saved"));
       return true;
     } catch (error) {
       if (quickInsert) {
@@ -347,7 +351,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
       } else {
         setStatuses((previous) => ({
           ...previous,
-          [id]: { error: error instanceof Error ? error.message : "Sync failed" },
+          [id]: { error: error instanceof Error ? error.message : t("Sync failed") },
         }));
       }
       return false;
@@ -365,12 +369,12 @@ function ReportDetail({ reportId }: { reportId: string }) {
         ...previous,
         [record.record_id]: {
           operation: "delete",
-          error: error instanceof Error ? error.message : "Delete failed",
+          error: error instanceof Error ? error.message : t("Delete failed"),
         },
       }));
     }
   }
-  if (state.loading && !state.data) return <Loading text="Loading report…" />;
+  if (state.loading && !state.data) return <Loading text={t("Loading report…")} />;
   if (state.error)
     return (
       <Alert
@@ -378,7 +382,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
         message={state.error}
         operation={
           <Button variant="text" onClick={() => action(state.refresh)}>
-            Retry
+            {t("Retry")}
           </Button>
         }
       />
@@ -388,16 +392,17 @@ function ReportDetail({ reportId }: { reportId: string }) {
     <div className="stack">
       <div className="page-heading">
         <div>
-          <Link to="/reports">← All reports</Link>
-          <h1>{state.data ? reportTitle({ ...state.data.report, title }) : "Report"}</h1>
+          <Link to="/reports">{t("← All reports")}</Link>
+          <h1>{state.data ? reportTitle({ ...state.data.report, title }) : t("Report")}</h1>
           {!editable && state.data && (
             <p className="muted">
-              Report time: {new Date(state.data.report.report_time).toLocaleString()}
+              {t("Report time")}:{" "}
+              {new Date(state.data.report.report_time).toLocaleString(getLanguage())}
             </p>
           )}
         </div>
         <Space>
-          <span>Editing</span>
+          <span>{t("Editing")}</span>
           <Switch
             value={editable}
             disabled={unsynced}
@@ -410,7 +415,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
           <div className="toolbar">
             {state.data && (
               <DatePicker
-                label="Report time"
+                label={t("Report time")}
                 enableTimePicker
                 allowInput
                 valueType="time-stamp"
@@ -428,12 +433,12 @@ function ReportDetail({ reportId }: { reportId: string }) {
               onChange={setTitle}
               onBlur={saveTitle}
               onEnter={saveTitle}
-              placeholder="Report title (optional)"
+              placeholder={t("Report title (optional)")}
             />
-            <span className="muted">{titleStatus}</span>
-            {titleStatus.includes("not saved") && (
+            <span className="muted">{titleStatus && t(titleStatus)}</span>
+            {titleStatus === "Title not saved — click Retry" && (
               <Button variant="text" onClick={saveTitle}>
-                Retry
+                {t("Retry")}
               </Button>
             )}
           </div>
@@ -447,9 +452,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
         <FilterControls value={filters} onChange={setFilters} />
         <RecordTotals records={visible} rates={rates} currency={currency} decimals={decimals} />
         <div className="toolbar">
-          <span className="muted">
-            {visible.length} of {records.length} records
-          </span>
+          <span className="muted">{t("{0} of {1} records", visible.length, records.length)}</span>
           {state.data && (
             <ExportButton
               disabled={unsynced || state.loading}
@@ -459,21 +462,20 @@ function ReportDetail({ reportId }: { reportId: string }) {
                 metadata,
                 currency,
                 decimals,
-                assetType: filters.assetTypes.length === 1 ? filters.assetTypes[0] : undefined,
               })}
             />
           )}
           {editable && (
             <Button shape="round" onClick={() => open()}>
-              Add record
+              {t("Add record")}
             </Button>
           )}
           <Button
             shape="round"
             variant="outline"
             icon={<RefreshIcon />}
-            aria-label="Refresh"
-            title="Refresh"
+            aria-label={t("Refresh")}
+            title={t("Refresh")}
             disabled={unsynced}
             loading={state.loading}
             onClick={() => {
@@ -488,8 +490,10 @@ function ReportDetail({ reportId }: { reportId: string }) {
             theme="info"
             message={
               <>
-                Before adding records, create your currencies, institutions, and asset types in{" "}
-                <Link to="/settings">Settings</Link>.
+                {t(
+                  "Before adding records, create your currencies, institutions, and asset types in",
+                )}{" "}
+                <Link to="/settings">{t("Settings")}</Link>.
               </>
             }
           />
@@ -499,7 +503,6 @@ function ReportDetail({ reportId }: { reportId: string }) {
           rates={rates}
           currency={currency}
           decimals={decimals}
-          assetType={filters.assetTypes.length === 1 ? filters.assetTypes[0] : undefined}
           editable={editable}
           statuses={statuses}
           onEdit={(record) => open(record)}
@@ -518,7 +521,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
         busy={ratesBusy || state.loading}
         setBusy={setRatesBusy}
       />
-      <Suspense fallback={<Loading text="Loading distributions…" />}>
+      <Suspense fallback={<Loading text={t("Loading distributions…")} />}>
         <ReportDistribution
           records={visible}
           rates={rates}

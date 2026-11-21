@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "../i18n";
 import { useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import {
@@ -50,7 +51,7 @@ export function ReportExchangeRates({
     label: item.name,
   }));
   const name = (id: string) =>
-    metadata.currencies.find((item) => item.currency_id === id)?.name || "Missing currency";
+    metadata.currencies.find((item) => item.currency_id === id)?.name || t("Missing currency");
   function open(row?: ExchangeRate) {
     setEditing(row || null);
     setNumerator(row?.numerator_currency_id || "");
@@ -84,7 +85,7 @@ export function ReportExchangeRates({
       ]);
       setEditing(undefined);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Save failed");
+      setError(reason instanceof Error ? reason.message : t("Save failed"));
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -108,24 +109,25 @@ export function ReportExchangeRates({
         ),
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Delete failed");
+      setError(reason instanceof Error ? reason.message : t("Delete failed"));
     } finally {
       submitting.current = false;
       setBusy(false);
     }
   }
   return (
-    <section aria-label="Report exchange rates">
-      <Card title="Report exchange rates">
+    <section aria-label={t("Report exchange rates")}>
+      <Card title={t("Report exchange rates")}>
         <p className="muted">
-          These rates belong only to this report. USD / CNY = 6 means 1 USD = 6 CNY. Inverse
-          conversion is automatic and uses the shortest path.
+          {t(
+            "These rates belong only to this report. USD / CNY = 6 means 1 USD = 6 CNY. Inverse conversion is automatic and uses the shortest path.",
+          )}
         </p>
         {error && editing === undefined && <Alert theme="error" message={error} />}
         {editable && (
           <div className="toolbar">
             <Button shape="round" disabled={busy} onClick={() => open()}>
-              Add exchange rate
+              {t("Add exchange rate")}
             </Button>
           </div>
         )}
@@ -135,41 +137,41 @@ export function ReportExchangeRates({
             ...row,
             key: `${row.numerator_currency_id}/${row.denominator_currency_id}`,
           }))}
-          empty="No exchange rates in this report yet."
+          empty={t("No exchange rates in this report yet.")}
           columns={[
             {
               colKey: "pair",
-              title: "Currency pair",
+              title: t("Currency pair"),
               cell: ({ row }) =>
                 `${name(row.numerator_currency_id)} / ${name(row.denominator_currency_id)}`,
             },
-            { colKey: "exchange_rate", title: "Rate" },
+            { colKey: "exchange_rate", title: t("Rate") },
             ...(editable
               ? [
                   {
                     colKey: "actions",
-                    title: "Actions",
+                    title: t("Actions"),
                     width: 160,
                     cell: ({ row }: { row: ExchangeRate }) => (
                       <Space>
                         <Button
                           variant="text"
                           icon={<EditIcon />}
-                          aria-label="Edit"
-                          title="Edit"
+                          aria-label={t("Edit")}
+                          title={t("Edit")}
                           disabled={busy}
                           onClick={() => open(row)}
                         />
                         <Popconfirm
-                          content="Delete this rate from this report?"
+                          content={t("Delete this rate from this report?")}
                           onConfirm={() => void remove(row)}
                         >
                           <Button
                             variant="text"
                             theme="danger"
                             icon={<DeleteIcon />}
-                            aria-label="Delete exchange rate"
-                            title="Delete exchange rate"
+                            aria-label={t("Delete exchange rate")}
+                            title={t("Delete exchange rate")}
                             disabled={busy}
                           />
                         </Popconfirm>
@@ -185,19 +187,19 @@ export function ReportExchangeRates({
             visible
             className="editor-dialog"
             placement="center"
-            header="Report exchange rate"
+            header={t("Report exchange rate")}
             onClose={() => {
               if (!busy) setEditing(undefined);
             }}
             onConfirm={() => void save()}
-            confirmBtn={{ content: "Save", loading: busy }}
+            confirmBtn={{ content: t("Save"), loading: busy }}
             closeOnOverlayClick={false}
           >
             {error && <Alert theme="error" message={error} />}
             <Form labelAlign="top">
               <EditorField
-                label="Numerator currency"
-                warning={attempted && !numerator && "Choose a currency"}
+                label={t("Numerator currency")}
+                warning={attempted && !numerator && t("Choose a currency")}
               >
                 <Select
                   value={numerator}
@@ -207,12 +209,12 @@ export function ReportExchangeRates({
                 />
               </EditorField>
               <EditorField
-                label="Denominator currency"
+                label={t("Denominator currency")}
                 warning={
                   attempted &&
                   (!denominator
-                    ? "Choose a currency"
-                    : numerator === denominator && "Choose a different currency")
+                    ? t("Choose a currency")
+                    : numerator === denominator && t("Choose a different currency"))
                 }
               >
                 <Select
@@ -223,8 +225,8 @@ export function ReportExchangeRates({
                 />
               </EditorField>
               <EditorField
-                label="Exchange rate"
-                warning={attempted && invalidRate && "Enter a positive rate"}
+                label={t("Exchange rate")}
+                warning={attempted && invalidRate && t("Enter a positive rate")}
               >
                 <InputNumber
                   value={rate ?? ""}

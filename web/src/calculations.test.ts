@@ -49,16 +49,17 @@ describe("currency valuation", () => {
   it("keeps original-currency totals separate and applies effective rates", () => {
     const rows = [record("USD", 100, 0.7), record("CNY", 67, 0.5)];
     const original = totals(rows, []);
-    expect(original.amounts.get("USD")?.effective).toBe(70);
-    expect(original.amounts.get("CNY")?.effective).toBe(33.5);
+    expect([...original.amounts]).toEqual([
+      ["USD", 70],
+      ["CNY", 33.5],
+    ]);
     const converted = totals(rows, [rate("USD", "CNY", 6.7)], "USD");
-    expect(converted.amounts.get("USD")?.effective).toBe(75);
-    expect(converted.amounts.get("USD")?.nominal).toBe(110);
+    expect([...converted.amounts]).toEqual([["USD", 75]]);
   });
   it("marks unconvertible records as missing rather than silently counting zero", () => {
     const result = totals([record("USD", 100), record("BTC", 2)], [], "USD");
     expect(result.missing).toBe(1);
-    expect(result.amounts.get("USD")?.effective).toBe(100);
+    expect(result.amounts.get("USD")).toBe(100);
   });
 });
 describe("report distributions and summaries", () => {
@@ -81,23 +82,21 @@ describe("report distributions and summaries", () => {
     ]);
     expect(assets.missing).toBe(0);
     expect([...assets.values.values()].reduce((a, b) => a + b, 0)).toBe(
-      totals(rows, rates, "CNY").amounts.get("CNY")!.effective,
+      totals(rows, rates, "CNY").amounts.get("CNY"),
     );
   });
   it("converts raw currency subtotals and refuses incomplete totals", () => {
     expect(
       convertTotals(
         [
-          { currency_id: "USD", nominal: 100, effective: 70 },
-          { currency_id: "CNY", nominal: 60, effective: 60 },
+          { currency_id: "USD", effective: 70 },
+          { currency_id: "CNY", effective: 60 },
         ],
         rates,
         "CNY",
       ),
     ).toBe(480);
-    expect(
-      convertTotals([{ currency_id: "BTC", nominal: 1, effective: 1 }], rates, "CNY"),
-    ).toBeNull();
+    expect(convertTotals([{ currency_id: "BTC", effective: 1 }], rates, "CNY")).toBeNull();
     expect(convertTotals([], rates, "CNY")).toBe(0);
     expect(distribution([record("BTC", 1)], rates, "CNY", "asset_type_id").missing).toBe(1);
   });

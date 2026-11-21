@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "./i18n";
 import { MessagePlugin } from "tdesign-react";
 import type { UserSettings } from "./types";
 
 export function showError(error: unknown) {
-  void MessagePlugin.error(error instanceof Error ? error.message : "Operation failed");
+  void MessagePlugin.error(error instanceof Error ? error.message : t("Operation failed"));
 }
 export function action(task: () => Promise<unknown>) {
   void task().catch(showError);

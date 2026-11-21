@@ -194,7 +194,7 @@ try {
     .fill("200");
   await dialog.getByRole("button", { name: "Save record" }).click();
   await page.getByText("Syncing…", { exact: true }).waitFor({ state: "hidden" });
-  await page.getByRole("cell", { name: "200.00 USD", exact: true }).waitFor();
+  await page.getByRole("cell", { name: "140.00 USD", exact: true }).waitFor();
   await page.route("**/api/records/*", async (route) => {
     if (route.request().method() === "PATCH") {
       await route.fulfill({ json: { code: 503, msg: "Temporary test failure", data: null } });
@@ -222,19 +222,22 @@ try {
   await api("POST", "/records", {
     ...records[0],
     content: "Second deposit",
-    amount: 50,
-    effective_rate: 1,
+    amount: 250,
+    effective_rate: 0.2,
     asset_custom_fields_data: [2],
   });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await page.getByRole("cell", { name: "Second deposit", exact: true }).waitFor();
+  await expect(page.getByRole("columnheader", { name: /^(Amount|Effective rate)$/ })).toHaveCount(
+    2,
+  );
   await page
-    .getByRole("columnheader", { name: "Nominal amount" })
+    .getByRole("columnheader", { name: "Effective value" })
     .locator(".t-table-sort-asc")
     .click();
   await expect(page.locator("tbody tr").first()).toContainText("Second deposit");
   await page
-    .getByRole("columnheader", { name: "Nominal amount" })
+    .getByRole("columnheader", { name: "Effective value" })
     .locator(".t-table-sort-desc")
     .click();
   await expect(page.locator("tbody tr").first()).toContainText("Savings");
@@ -258,7 +261,8 @@ try {
     .locator(".t-select")
     .click();
   await page.locator(".t-select-option").filter({ hasText: /^CNY$/ }).click();
-  await page.getByText("(938.00 CNY)", { exact: true }).waitFor();
+  await page.getByRole("cell", { name: "140.00 USD (938.00 CNY)", exact: true }).waitFor();
+  await expect(page.getByRole("columnheader", { name: /^Effective value in / })).toHaveCount(0);
   await expect(page.locator(".total-number")).toHaveText("1,273.00");
   await page
     .locator(".toolbar")
@@ -289,7 +293,7 @@ try {
   await page.screenshot({ path: "../user-data/analysis-mobile.png", fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${frontend}/#/reports/${reportId}`);
-  await page.getByRole("cell", { name: "200.00 USD", exact: true }).waitFor();
+  await page.getByRole("cell", { name: "140.00 USD", exact: true }).waitFor();
   records = await api("GET", "/records");
   assert.equal(records[0].amount, 200);
   await page.getByRole("button", { name: "Delete", exact: true }).click();

@@ -1,26 +1,29 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { getLanguage, t } from "./i18n";
+import { exportFonts } from "./exportFonts";
 import { zipSync } from "fflate";
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
-import writeXlsxFile, { type SheetData } from "write-excel-file/browser";
+import ExcelJS from "exceljs";
 import fontUrl from "@expo-google-fonts/noto-sans-sc/400Regular/NotoSansSC_400Regular.ttf?url";
-import { displayValue } from "./helpers";
-import {
-  conversion,
-  customFields,
-  customValue,
-  number,
-  reportTitle,
-  totals,
-  validFieldValue,
-} from "./calculations";
+import { formatReportField, mergeReportFields, reportFields } from "./reportFields";
+import { addPdfBookmarks, type PdfBookmark } from "./pdfBookmarks";
+import { formatEffectiveValue, number, reportTitle, totals } from "./calculations";
 import type { AssetRecord, Metadata, Report } from "./types";
 
 interface Section {
   title: string;
   columns: string[];
   rows: (string | number)[][];
+  footer?: (string | number)[];
   amounts?: number[];
+  mono?: number[];
+  bookmark?: boolean;
+}
+
+interface ReportView {
+  name: string;
+  sections: Section[];
 }
 
 export interface ReportExport {
@@ -29,7 +32,7 @@ export interface ReportExport {
   metadata: Metadata;
   currency: string;
   decimals: number;
-  assetType?: string;
+  selectedFields?: ReadonlySet<string>;
 }
 
 function reportSections({
@@ -37,10 +40,11 @@ function reportSections({
   records,
   metadata,
   currency,
-  assetType,
-}: ReportExport): Section[] {
+  decimals,
+  selectedFields,
+}: ReportExport): ReportView[] {
   const names = new Map(metadata.currencies.map((item) => [item.currency_id, item.name]));
-  const currencyName = (id: string) => names.get(id) ?? "Missing currency";
+  const currencyName = (id: string) => names.get(id) ?? t("Missing currency");
   const types = new Map(metadata.asset_types.map((item) => [item.asset_type_id, item]));
   const institutions = new Map(
     metadata.institutions.map((item) => [item.institution_id, item.name]),
@@ -49,130 +53,233 @@ function reportSections({
   const summary = totals(records, rates, currency);
   const sections: Section[] = [
     {
-      title: "Exchange rates",
-      columns: ["Currency pair", "Rate"],
+      title: t("Exchange rates"),
+      mono: [0, 1],
+      columns: [t("Currency pair"), t("Rate")],
       rows: rates.map((r) => [
         `${currencyName(r.numerator_currency_id)} / ${currencyName(r.denominator_currency_id)}`,
         r.exchange_rate,
       ]),
     },
     {
-      title: summary.missing ? "Totals (partial)" : "Totals",
-      columns: ["Currency", "Nominal amount", "Effective value"],
-      amounts: [1, 2],
-      rows: [...summary.amounts].map(([id, value]) => [
-        currencyName(id),
-        value.nominal,
-        value.effective,
-      ]),
+      title: summary.missing ? t("Totals (partial)") : t("Totals"),
+      columns: [t("Currency"), t("Effective value")],
+      amounts: [1],
+      mono: [0, 1],
+      rows: [...summary.amounts].map(([id, value]) => [currencyName(id), value]),
     },
   ];
-  const fields = customFields(assetType && types.get(assetType)?.custom_fields);
-  const displayed = [...fields].sort((a, b) => a.display_order - b.display_order);
-  const columns = [
-    "Content",
-    "Asset type",
-    "Currency",
-    "Nominal amount",
-    "Effective rate",
-    "Effective value",
-  ];
+  const fields = mergeReportFields(
+    reportFields(records, metadata.asset_types).filter(
+      (column) => !selectedFields || selectedFields.has(column.key),
+    ),
+  );
+  const dimensions = {
+    institution_id: t("Institution"),
+    asset_type_id: t("Asset type"),
+    currency_id: t("Currency"),
+  };
+  const keys = ["institution_id", "asset_type_id", "currency_id"] as const;
+  const financial = [t("Amount"), t("Effective rate"), t("Effective value")];
   const amounts = [3, 5];
-  const converted = currency && records.some((row) => row.currency_id !== currency);
-  if (converted) {
-    columns.push(`Nominal (${currencyName(currency)})`, `Effective (${currencyName(currency)})`);
-    amounts.push(6, 7);
-  }
-  columns.push(...displayed.map((field) => field.field_name));
-  const groups = new Map<string, Section>();
-  for (const record of records) {
-    const id = record.institution_id;
-    if (!groups.has(id))
-      groups.set(id, {
-        title: institutions.get(id) ?? "Missing institution",
-        columns,
-        amounts,
-        rows: [],
-      });
-    const effective = record.amount * record.effective_rate;
-    const row = [
-      record.content,
-      types.get(record.asset_type_id)?.name ?? "Missing asset type",
-      currencyName(record.currency_id),
-      record.amount,
-      record.effective_rate,
-      effective,
-    ];
-    if (converted) {
-      const factor = conversion(rates, record.currency_id, currency);
-      for (const amount of [record.amount, effective])
-        row.push(factor === null ? "No conversion path" : amount * factor);
+  const valued = records.map((record) => {
+    const labels = {
+      institution_id: institutions.get(record.institution_id) ?? t("Missing institution"),
+      asset_type_id: types.get(record.asset_type_id)?.name ?? t("Missing asset type"),
+      currency_id: currencyName(record.currency_id),
+    };
+    const effective =
+      currency && currency !== record.currency_id
+        ? formatEffectiveValue(record, rates, currency, decimals, currencyName)
+        : record.amount * record.effective_rate;
+    const row: (string | number)[] = [record.amount, record.effective_rate, effective];
+    return {
+      record,
+      labels,
+      row: row.map((v) => (typeof v === "number" && !Number.isFinite(v) ? t("Invalid value") : v)),
+    };
+  });
+  const namesByGroup = {
+    institution_id: t("By institution"),
+    asset_type_id: t("By asset type"),
+    currency_id: t("By currency"),
+  };
+  return keys.map((key) => {
+    const others = keys.filter((k) => k !== key);
+    const columns = [t("Content"), ...others.map((k) => dimensions[k]), ...financial];
+    const groups = new Map<string, typeof valued>();
+    const mono = [...others.flatMap((k, i) => (k === "currency_id" ? [i + 1] : [])), 5];
+    for (const item of valued) {
+      const id = item.record[key];
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id)!.push(item);
     }
-    for (const field of displayed) {
-      const value = customValue(record, fields, field);
-      row.push(
-        !validFieldValue(field, value)
-          ? "Needs correction"
-          : value == null
-            ? "—"
-            : `${field.prefix}${displayValue(value)}${field.postfix}`,
-      );
-    }
-    groups
-      .get(id)!
-      .rows.push(
-        row.map((v) => (typeof v === "number" && !Number.isFinite(v) ? "Invalid value" : v)),
-      );
-  }
-  if (!groups.size) sections.push({ title: "Records", columns, rows: [] });
-  return sections.concat([...groups.values()].sort((a, b) => a.title.localeCompare(b.title)));
+    const sorted = [...groups.values()]
+      .map((items): Section => {
+        const present = new Set(items.map(({ record }) => record.asset_type_id));
+        const displayed = fields.filter((column) =>
+          [...present].some((id) => column.byType.has(id)),
+        );
+        const section: Section = {
+          title: items[0].labels[key],
+          bookmark: true,
+          columns: [...columns, ...displayed.map((column) => column.title)],
+          amounts,
+          mono,
+          rows: items.map(({ record, labels, row }) => [
+            record.content,
+            ...others.map((k) => labels[k]),
+            ...row,
+            ...displayed.map((column) => formatReportField(record, column)),
+          ]),
+        };
+        if (currency) {
+          const subtotal = totals(
+            items.map(({ record }) => record),
+            rates,
+            currency,
+          );
+          section.footer = Array<string | number>(section.columns.length).fill("");
+          section.footer[0] = t(
+            subtotal.missing ? "Partial subtotal ({0})" : "Subtotal ({0})",
+            currencyName(currency),
+          );
+          section.footer[5] = subtotal.amounts.get(currency) ?? "—";
+        }
+        return section;
+      })
+      .sort((a, b) => a.title.localeCompare(b.title, getLanguage()));
+    return {
+      name: namesByGroup[key],
+      sections: [
+        ...sections,
+        ...(sorted.length ? sorted : [{ title: t("Records"), columns, rows: [] }]),
+      ],
+    };
+  });
 }
 
-function workbook(title: string, date: string, sections: Section[], decimals: number) {
-  const width = Math.max(...sections.map((s) => s.columns.length));
-  const sheet: SheetData = [
-    [{ value: title, columnSpan: width, fontSize: 18, fontWeight: "bold", wrap: true }],
-    ["Report time", date],
-  ];
+async function workbook(title: string, date: string, views: ReportView[], decimals: number) {
+  const book = new ExcelJS.Workbook();
+  const fonts = exportFonts();
   const format = decimals ? `#,##0.${"0".repeat(decimals)}` : "#,##0";
-  for (const section of sections) {
-    sheet.push(
-      [],
-      [{ value: section.title, columnSpan: width, fontWeight: "bold", fontSize: 13, wrap: true }],
-    );
-    if (!section.rows.length) {
-      sheet.push(["None"]);
-      continue;
+  for (const view of views) {
+    const sheet = book.addWorksheet(view.name, {
+      views: [{ showGridLines: false }],
+      pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+    });
+    const width = Math.max(...view.sections.map((s) => s.columns.length));
+    sheet.columns = Array.from({ length: width }, (_, i) => ({
+      width: i === 0 ? 36 : i === 1 ? 26 : 18,
+    }));
+    function add(values: (string | number)[], size = 11, bold = false, monoColumns: number[] = []) {
+      const row = sheet.addRow(values.map((value) => (value === "" ? null : value)));
+      values.forEach((value, i) => {
+        const cell = row.getCell(i + 1);
+        const mono = typeof value === "number" || monoColumns.includes(i);
+        const latin = fonts[mono ? "English Mono" : "English"];
+        const other = fonts[mono ? "Non-English Mono" : "Non-English"];
+        const runs =
+          typeof value === "string"
+            ? value.match(/[\p{ASCII}\p{Script=Latin}]+|[^\p{ASCII}\p{Script=Latin}]+/gu)
+            : null;
+        const font = (text: string) => ({
+          name: /^[\p{ASCII}\p{Script=Latin}]/u.test(text) ? latin : other,
+          size,
+          bold,
+        });
+        cell.font = runs?.length ? font(runs[0]) : { name: latin, size, bold };
+        if (runs && runs.length > 1)
+          cell.value = { richText: runs.map((text) => ({ text, font: font(text) })) };
+        cell.alignment = { wrapText: true, vertical: "top" };
+      });
+      return row;
     }
-    sheet.push(
-      section.columns.map((value) => ({
-        value,
-        fontWeight: "bold",
-        bottomBorderStyle: "thin",
-        bottomBorderColor: "#888888",
-        wrap: true,
-      })),
-    );
-    for (const row of section.rows)
-      sheet.push(
-        row.map((value, index) => ({
-          value,
-          wrap: true,
-          alignVertical: "top",
-          format:
-            section.amounts?.includes(index) && typeof value === "number" ? format : undefined,
-        })),
-      );
+    function heading(text: string, size: number) {
+      const row = add([text], size, true);
+      sheet.mergeCells(row.number, 1, row.number, width);
+    }
+    heading(title, 18);
+    add([t("Report time"), date], 11, false, [1]);
+    for (const section of view.sections) {
+      sheet.addRow([]);
+      heading(section.title, 13);
+      if (!section.rows.length) {
+        add([t("None")]);
+        continue;
+      }
+      add(section.columns, 11, true).eachCell((cell) => {
+        cell.border = { bottom: { style: "thin", color: { argb: "FF888888" } } };
+      });
+      for (const values of section.rows) {
+        const row = add(values, 11, false, section.mono);
+        for (const i of section.amounts ?? [])
+          if (typeof values[i] === "number") row.getCell(i + 1).numFmt = format;
+      }
+      if (section.footer) {
+        const footer = add(section.footer, 11, true);
+        for (const i of section.amounts ?? [])
+          if (typeof section.footer[i] === "number") footer.getCell(i + 1).numFmt = format;
+      }
+    }
   }
-  return writeXlsxFile(sheet, {
-    sheet: "Report",
-    showGridLines: false,
-    orientation: "landscape",
-    columns: Array.from({ length: width }, (_, i) => ({ width: i === 0 ? 36 : i === 1 ? 26 : 18 })),
-  }).toBlob();
+  return new Uint8Array(await book.xlsx.writeBuffer());
 }
 
-async function pdfDocument(title: string, date: string, sections: Section[], decimals: number) {
+const pdfTableFontSize = 9;
+const pdfCellPadding = 4;
+
+function layoutPdfTable(
+  doc: jsPDF,
+  section: Section,
+  decimals: number,
+  font: string,
+  bold: "normal" | "bold",
+) {
+  const formatRow = (row: (string | number)[]) =>
+    row.map((value, i) =>
+      typeof value === "number" && section.amounts?.includes(i)
+        ? number(value, decimals)
+        : String(value),
+    );
+  const columns = section.rows.length ? section.columns : [""];
+  const body = section.rows.length ? section.rows.map(formatRow) : [[t("None")]];
+  const foot = section.footer ? [formatRow(section.footer)] : [];
+  function textWidth(text: string, limit: number) {
+    let width = 0;
+    for (const line of text.split(/\r\n|\r|\n/)) {
+      width = Math.max(width, doc.getTextWidth(line));
+      if (width >= limit) return limit;
+    }
+    return width;
+  }
+  doc.setFont(font, bold).setFontSize(pdfTableFontSize);
+  const widths = columns.map((label) => textWidth(label, 120));
+  for (const row of foot)
+    row.forEach((text, i) => {
+      widths[i] = Math.max(widths[i], textWidth(text, 220));
+    });
+  if (columns.length === 1) {
+    doc.setFontSize(12);
+    widths[0] = Math.max(widths[0], textWidth(section.title, 220));
+  }
+  doc.setFont(font, "normal").setFontSize(pdfTableFontSize);
+  for (const row of body)
+    row.forEach((text, i) => {
+      widths[i] = Math.max(widths[i], textWidth(text, 220));
+    });
+  const cellWidths = widths.map((w) => Math.ceil(w) + 2 * pdfCellPadding + 1);
+  return {
+    section,
+    columns,
+    body,
+    foot,
+    cellWidths,
+    width: cellWidths.reduce((sum, w) => sum + w, 0),
+  };
+}
+
+async function pdfDocument(title: string, date: string, views: ReportView[], decimals: number) {
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "pt",
@@ -183,9 +290,9 @@ async function pdfDocument(title: string, date: string, sections: Section[], dec
   doc.setProperties({ title, creator: "Fortuna" });
   let font = "helvetica";
   // The PDF's built-in Latin fonts can't render CJK names or record content.
-  if (/[\u0100-\u200f\u2028-\u{10ffff}]/u.test(JSON.stringify([title, date, sections]))) {
+  if (/[\u0100-\u200f\u2028-\u{10ffff}]/u.test(JSON.stringify([title, date, views]))) {
     const response = await fetch(fontUrl);
-    if (!response.ok) throw new Error("Could not load the PDF font");
+    if (!response.ok) throw new Error(t("Could not load the PDF font"));
     const bytes = new Uint8Array(await response.arrayBuffer());
     let binary = "";
     for (let i = 0; i < bytes.length; i += 8192)
@@ -195,8 +302,23 @@ async function pdfDocument(title: string, date: string, sections: Section[], dec
     doc.addFont("NotoSansSC.ttf", font, "normal");
   }
   const margin = 32;
-  const width = doc.internal.pageSize.getWidth() - 2 * margin;
   const bold = font === "helvetica" ? "bold" : "normal";
+  let pageWidth = doc.internal.pageSize.getWidth();
+  const layouts = views.map((view) => ({
+    name: view.name,
+    tables: view.sections.map((section) => {
+      const table = layoutPdfTable(doc, section, decimals, font, bold);
+      pageWidth = Math.max(pageWidth, table.width + 2 * margin);
+      return table;
+    }),
+  }));
+  // jsPDF uses the last added page format for automatic continuation pages.
+  if (pageWidth > doc.internal.pageSize.getWidth()) {
+    pageWidth = Math.min(pageWidth, 14400);
+    doc.addPage([pageWidth, doc.internal.pageSize.getHeight()], "landscape");
+    doc.deletePage(1);
+  }
+  const width = pageWidth - 2 * margin;
   doc.setFont(font, bold).setFontSize(19);
   const lines: string[] = doc.splitTextToSize(title, width);
   // AutoTable paginates long titles, multiline records and repeated column headings.
@@ -204,57 +326,88 @@ async function pdfDocument(title: string, date: string, sections: Section[], dec
   const common = {
     theme: "plain" as const,
     margin,
-    styles: { font, fontStyle: "normal" as const, textColor: 28, fontSize: 9, cellPadding: 4 },
+    styles: {
+      font,
+      fontStyle: "normal" as const,
+      textColor: 28,
+      fontSize: pdfTableFontSize,
+      cellPadding: pdfCellPadding,
+    },
     didDrawPage: ({ cursor }: { cursor: { y: number } | null }) => {
       if (cursor) y = cursor.y + 12;
     },
   };
-  autoTable(doc, {
-    ...common,
-    startY: y,
-    body: [
-      [{ content: lines, styles: { fontSize: 19, fontStyle: bold } }],
-      [`Report time  ${date}`],
-    ],
-  });
-  for (const section of sections) {
-    const body = section.rows.map((row) =>
-      row.map((value, i) =>
-        typeof value === "number" && section.amounts?.includes(i)
-          ? number(value, decimals)
-          : String(value),
-      ),
-    );
-    const columns = section.rows.length ? section.columns : [""];
+  const bookmarks: PdfBookmark[] = [];
+  for (const [index, view] of layouts.entries()) {
+    if (index) doc.addPage();
+    const children: PdfBookmark[] = [];
+    bookmarks.push({
+      title: view.name,
+      page: doc.getCurrentPageInfo().pageNumber,
+      y: doc.internal.pageSize.getHeight(),
+      children,
+    });
+    y = margin;
     autoTable(doc, {
       ...common,
       startY: y,
-      horizontalPageBreak: columns.length > 9,
-      horizontalPageBreakRepeat: 0,
-      headStyles: { fontStyle: bold, textColor: 28, lineWidth: { bottom: 0.5 }, lineColor: 170 },
-      head: [
-        [
-          {
-            content: section.title,
-            colSpan: columns.length,
-            styles: { fontSize: 12, lineWidth: 0 },
-          },
-        ],
-        ...(body.length ? [columns] : []),
+      body: [
+        [{ content: lines, styles: { fontSize: 19, fontStyle: bold } }],
+        [`${view.name}   ·   ${t("Report time")}  ${date}`],
       ],
-      body: body.length ? body : [["None"]],
-      columnStyles: Object.fromEntries(
-        columns.map((_, i) => [
-          i,
-          {
-            halign: section.amounts?.includes(i) ? "right" : "left",
-            cellWidth: columns.length > 9 ? (i === 0 ? 165 : 83) : "auto",
-          },
-        ]),
-      ),
     });
+    for (const table of view.tables) {
+      const { section, columns, body, foot, cellWidths } = table;
+      const scale = Math.min(1, width / table.width);
+      let bookmarkPending = section.bookmark;
+      autoTable(doc, {
+        ...common,
+        startY: y,
+        willDrawCell: ({ section: part, cell }) => {
+          if (bookmarkPending && part === "head") {
+            children.push({
+              title: section.title,
+              page: doc.getCurrentPageInfo().pageNumber,
+              y: doc.internal.pageSize.getHeight() - cell.y,
+            });
+            bookmarkPending = false;
+          }
+        },
+        tableWidth: table.width * scale,
+        styles: {
+          ...common.styles,
+          cellPadding: pdfCellPadding * scale,
+          fontSize: pdfTableFontSize * scale,
+        },
+        headStyles: { fontStyle: bold, textColor: 28, lineWidth: { bottom: 0.5 }, lineColor: 170 },
+        head: [
+          [
+            {
+              content: section.title,
+              colSpan: columns.length,
+              styles: { fontSize: 12 * scale, lineWidth: 0 },
+            },
+          ],
+          ...(section.rows.length ? [columns] : []),
+        ],
+        body,
+        foot,
+        showFoot: "lastPage",
+        footStyles: { fontStyle: bold, textColor: 28, lineWidth: { top: 0.5 }, lineColor: 170 },
+        columnStyles: Object.fromEntries(
+          cellWidths.map((cellWidth, i) => [
+            i,
+            {
+              halign: section.amounts?.includes(i) ? "right" : "left",
+              cellWidth: cellWidth * scale,
+            },
+          ]),
+        ),
+      });
+    }
   }
   const count = doc.getNumberOfPages();
+  addPdfBookmarks(doc, bookmarks);
   for (let i = 1; i <= count; i++) {
     doc.setPage(i).setFont(font, "normal").setFontSize(8).setTextColor(95);
     doc.text(`${i} / ${count}`, width + margin, doc.internal.pageSize.getHeight() - 14, {
@@ -266,7 +419,7 @@ async function pdfDocument(title: string, date: string, sections: Section[], dec
 
 export async function downloadReport(input: ReportExport) {
   const title = reportTitle(input.report);
-  const date = new Date(input.report.report_time).toLocaleString();
+  const date = new Date(input.report.report_time).toLocaleString(getLanguage());
   const sections = reportSections(input);
   const [xlsx, pdf] = await Promise.all([
     workbook(title, date, sections, input.decimals),
@@ -276,11 +429,8 @@ export async function downloadReport(input: ReportExport) {
     title
       .replace(/[\p{Cc}<>:"/\\|?*]/gu, "_")
       .slice(0, 90)
-      .replace(/[. ]+$/, "") || "Report";
-  const zip = zipSync(
-    { [`${base}.xlsx`]: new Uint8Array(await xlsx.arrayBuffer()), [`${base}.pdf`]: pdf },
-    { level: 0 },
-  );
+      .replace(/[. ]+$/, "") || t("Report");
+  const zip = zipSync({ [`${base}.xlsx`]: xlsx, [`${base}.pdf`]: pdf }, { level: 0 });
   const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
   const link = document.createElement("a");
   link.href = url;

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "../i18n";
 import type { ReactNode } from "react";
 import { Dialog, Form } from "tdesign-react";
 
@@ -29,7 +30,7 @@ export function EditorField({
 
 export function EditorDialog({
   title,
-  saveLabel = "Save",
+  saveLabel = t("Save"),
   saving = false,
   onSave,
   onClose,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "../i18n";
 import { Empty } from "tdesign-react";
 import type { ECharts, ECElementEvent } from "echarts/core";
+import { format } from "echarts/core";
 import { Chart } from "./Chart";
 
 interface Snapshot {
@@ -32,7 +34,7 @@ function tooltipCard(title: string, rows: [string, string][], total: string) {
   const heading = document.createElement("strong");
   heading.textContent = title;
   card.append(heading);
-  for (const [name, value] of [...rows, ["Total", total]]) {
+  for (const [name, value] of [...rows, [t("Total"), total]]) {
     const row = document.createElement("div");
     row.textContent = `${name}: ${value}`;
     card.append(row);
@@ -94,11 +96,25 @@ export function StackedChart({ points, groups, groupLabel, currencyName, money }
       });
     }
     chart.on("mousemove", "series.line", hover);
-    chart.on("mouseout", "series.line", hide);
+    function legendHover({ value, event }: ECElementEvent) {
+      if (!event || typeof value !== "string") return;
+      const text = document.createElement("div");
+      text.style.whiteSpace = "pre-line";
+      text.textContent = value;
+      chart.dispatchAction({
+        type: "showTip",
+        x: event.offsetX,
+        y: event.offsetY,
+        tooltip: { formatter: () => text },
+      });
+    }
+    chart.on("mousemove", "legend", legendHover);
+    chart.on("mouseout", hide);
     chart.getZr().on("globalout", hide);
     chart.on("legendselectchanged", legendChange);
     return () => {
       chart.off("mousemove", hover);
+      chart.off("mousemove", legendHover);
       chart.off("mouseout", hide);
       chart.getZr()?.off("globalout", hide);
       chart.off("legendselectchanged", legendChange);
@@ -106,12 +122,27 @@ export function StackedChart({ points, groups, groupLabel, currencyName, money }
   }
   return (
     <Chart
-      label={`Effective asset value stacked by ${groupLabel} over time`}
+      label={t("Effective asset value stacked by {0} over time", groupLabel)}
       bindEvents={bindEvents}
       option={{
         animation: false,
         tooltip: { ...tooltip, triggerOn: "none" },
-        legend: { top: 0, type: "scroll" },
+        legend: {
+          type: "scroll",
+          top: 0,
+          left: 8,
+          right: 8,
+          triggerEvent: true,
+          formatter: (name: string) => {
+            const [first, ...rest] = name.trim().split(/[\r\n]+/);
+            return format.truncateText(
+              rest.length ? `${first}...` : first,
+              120,
+              "12px sans-serif",
+              "...",
+            );
+          },
+        },
         grid: { left: 80, right: 30, top: 50, bottom: 80 },
         xAxis: { type: "time", splitNumber: 4, axisLabel: { hideOverlap: true } },
         yAxis: { type: "value", name: currencyName },
@@ -131,7 +162,7 @@ export function StackedChart({ points, groups, groupLabel, currencyName, money }
           })),
           {
             id: "total",
-            name: "Total",
+            name: t("Total"),
             type: "line",
             triggerEvent: true,
             symbolSize: 6,
@@ -160,7 +191,7 @@ export function ReportSankey({ points, groups, groupLabel, money }: ChartProps) 
       nodes.push({
         name: "total",
         depth: 0,
-        label: { formatter: hasNegative ? "Absolute balances" : "Total" },
+        label: { formatter: hasNegative ? t("Absolute balances") : t("Total") },
         itemStyle: { color: "#24352f" },
         index,
       });
@@ -214,8 +245,8 @@ export function ReportSankey({ points, groups, groupLabel, money }: ChartProps) 
       <Empty
         description={
           points.length
-            ? "No valued balances in the selected reports"
-            : "Choose reports to compare."
+            ? t("No valued balances in the selected reports")
+            : t("Choose reports to compare.")
         }
       />
     );
@@ -258,7 +289,7 @@ export function ReportSankey({ points, groups, groupLabel, money }: ChartProps) 
             ))}
           </div>
           <Chart
-            label={`Report Sankey by ${groupLabel}`}
+            label={t("Report Sankey by {0}", groupLabel)}
             style={{ minHeight: maxGroups * 16 + 40 }}
             option={{
               animation: false,

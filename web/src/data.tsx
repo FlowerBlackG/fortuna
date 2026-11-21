@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "./i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { request } from "./api";
@@ -32,7 +33,7 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
         return latest.current;
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "Could not refresh metadata");
+        setError(reason instanceof Error ? reason.message : t("Could not refresh metadata"));
         throw reason;
       })
       .finally(() => {

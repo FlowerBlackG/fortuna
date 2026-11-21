@@ -53,7 +53,6 @@ export interface Report {
 }
 export interface CurrencyTotal {
   currency_id: string;
-  nominal: number;
   effective: number;
 }
 export interface AssetRecord {

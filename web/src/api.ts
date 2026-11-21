@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t, serverMessage } from "./i18n";
 import axios from "axios";
 import type { IResponse } from "./response";
 import type { BuildInfo } from "./version";
@@ -31,7 +32,7 @@ export function setServer(value: string) {
 export function normalizeServer(value: string) {
   const url = new URL(value.trim());
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
-    throw new Error("Enter an HTTP or HTTPS server address");
+    throw new Error(t("Enter an HTTP or HTTPS server address"));
   }
   url.hash = "";
   url.search = "";
@@ -42,7 +43,7 @@ export async function ping(address: string): Promise<BuildInfo> {
     IResponse<{ app: string; version: string; version_code?: number; build_time?: string }>
   >(`${normalizeServer(address)}/api/ping`, { timeout: 6000 });
   if (response.data?.code !== 200 || response.data.data?.app !== "Fortuna") {
-    throw new Error("This address did not respond as a Fortuna server");
+    throw new Error(t("This address did not respond as a Fortuna server"));
   }
   const { version, version_code, build_time } = response.data.data;
   return { tag: version, code: version_code, buildTime: build_time };
@@ -58,7 +59,7 @@ export class ApiError extends Error {
 export async function request<T>(method: string, path: string, data?: unknown): Promise<T> {
   if (!server) {
     sessionEvents.dispatchEvent(new Event("configure"));
-    throw new Error("Configure your server first");
+    throw new Error(t("Configure your server first"));
   }
   const requestServer = server;
   const requestToken = token;
@@ -71,9 +72,9 @@ export async function request<T>(method: string, path: string, data?: unknown): 
     headers: requestToken ? { "Fortuna-Auth": requestToken } : {},
   });
   const body = response.data;
-  if (!body || typeof body.code !== "number") throw new Error("Unexpected response from server");
+  if (!body || typeof body.code !== "number") throw new Error(t("Unexpected response from server"));
   if (body.code === 401 && server === requestServer && token === requestToken) setToken("");
-  if (body.code !== 200) throw new ApiError(body.code, body.msg);
+  if (body.code !== 200) throw new ApiError(body.code, serverMessage(body.msg));
   return body.data;
 }
 

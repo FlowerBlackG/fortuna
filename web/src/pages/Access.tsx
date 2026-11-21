@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t } from "../i18n";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Alert, Button, Card, Form, Input, Radio, Space } from "tdesign-react";
@@ -25,26 +26,26 @@ export function ServerPage({
       onConnected({ address: serverAddress(), version });
       await navigate(authToken() ? "/reports" : "/login");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Connection failed");
+      setError(reason instanceof Error ? reason.message : t("Connection failed"));
     } finally {
       setLoading(false);
     }
   }
   return (
     <main className="access-page">
-      <Card title="Connect to your Fortuna server" className="access-card">
+      <Card title={t("Connect to your Fortuna server")} className="access-card">
         {error && <Alert theme="error" message={error} />}
         <Form labelAlign="top" onSubmit={() => void connect()}>
-          <Form.FormItem label="Server address" initialData={address}>
+          <Form.FormItem label={t("Server address")} initialData={address}>
             <Input value={address} onChange={setAddress} placeholder="http://localhost:5000" />
           </Form.FormItem>
           <Space>
             <Button type="submit" loading={loading}>
-              Test & connect
+              {t("Test & connect")}
             </Button>
             {serverAddress() && (
               <Button variant="outline" onClick={() => navigate("/reports")}>
-                Back
+                {t("Back")}
               </Button>
             )}
           </Space>
@@ -65,11 +66,11 @@ export function AuthPage() {
   async function submit() {
     setError("");
     if (!username.trim() || !password) {
-      setError("Enter your username and password");
+      setError(t("Enter your username and password"));
       return;
     }
     if (mode === "register" && password !== confirm) {
-      setError("Passwords do not match");
+      setError(t("Passwords do not match"));
       return;
     }
     setLoading(true);
@@ -82,7 +83,7 @@ export function AuthPage() {
       setToken(result.token);
       await navigate("/reports");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Login failed");
+      setError(reason instanceof Error ? reason.message : t("Login failed"));
     } finally {
       setLoading(false);
     }
@@ -102,15 +103,15 @@ export function AuthPage() {
             setError("");
           }}
         >
-          <Radio.Button value="login">Log in</Radio.Button>
-          <Radio.Button value="register">Create account</Radio.Button>
+          <Radio.Button value="login">{t("Log in")}</Radio.Button>
+          <Radio.Button value="register">{t("Create account")}</Radio.Button>
         </Radio.Group>
         {error && <Alert theme="error" message={error} />}
         <Form labelAlign="top" onSubmit={() => void submit()}>
-          <Form.FormItem label="Username">
+          <Form.FormItem label={t("Username")}>
             <Input value={username} onChange={setUsername} autocomplete="username" />
           </Form.FormItem>
-          <Form.FormItem label="Password">
+          <Form.FormItem label={t("Password")}>
             <Input
               type="password"
               value={password}
@@ -119,7 +120,7 @@ export function AuthPage() {
             />
           </Form.FormItem>
           {mode === "register" && (
-            <Form.FormItem label="Confirm password">
+            <Form.FormItem label={t("Confirm password")}>
               <Input
                 type="password"
                 value={confirm}
@@ -129,11 +130,11 @@ export function AuthPage() {
             </Form.FormItem>
           )}
           <Button block type="submit" loading={loading}>
-            {mode === "login" ? "Log in" : "Create account"}
+            {mode === "login" ? t("Log in") : t("Create account")}
           </Button>
         </Form>
         <Button variant="text" icon={<ServerIcon />} block onClick={() => navigate("/server")}>
-          Server: {serverAddress()}
+          {t("Server")}: {serverAddress()}
         </Button>
       </Card>
     </main>

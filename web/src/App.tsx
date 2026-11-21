@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MulanPSL-2.0
+import { t, useLanguage } from "./i18n";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { Alert, Button, ConfigProvider, Layout, Loading, Menu, Space } from "tdesign-react";
 import enUS from "tdesign-react/es/locale/en_US";
+import zhCN from "tdesign-react/es/locale/zh_CN";
 import {
   ChartLineIcon,
   FileIcon,
@@ -39,9 +41,9 @@ function WorkspaceMenu() {
     narrow.addEventListener("change", resize);
     return () => narrow.removeEventListener("change", resize);
   }, [narrow]);
-  const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  const toggleLabel = collapsed ? t("Expand sidebar") : t("Collapse sidebar");
   return (
-    <nav className="app-sidebar" aria-label="Workspace">
+    <nav className="app-sidebar" aria-label={t("Workspace")}>
       <Menu
         width={["192px", "64px"]}
         collapsed={collapsed}
@@ -65,15 +67,15 @@ function WorkspaceMenu() {
             <Button
               variant="text"
               icon={<ServerIcon />}
-              aria-label="Server"
-              title="Server"
+              aria-label={t("Server")}
+              title={t("Server")}
               onClick={() => navigate("/server")}
             />
             <Button
               variant="text"
               icon={<LogoutIcon />}
-              aria-label="Log out"
-              title="Log out"
+              aria-label={t("Log out")}
+              title={t("Log out")}
               onClick={() =>
                 action(async () => {
                   await request("POST", "/logout");
@@ -85,16 +87,16 @@ function WorkspaceMenu() {
         }
       >
         <Menu.MenuItem value="reports" href="#/reports" icon={<FileIcon />}>
-          Reports
+          {t("Reports")}
         </Menu.MenuItem>
         <Menu.MenuItem value="analysis" href="#/analysis" icon={<ChartLineIcon />}>
-          Analysis
+          {t("Analysis")}
         </Menu.MenuItem>
         <Menu.MenuItem value="settings" href="#/settings" icon={<SettingIcon />}>
-          Settings
+          {t("Settings")}
         </Menu.MenuItem>
         <Menu.MenuItem value="about" href="#/about" icon={<InfoCircleIcon />}>
-          About
+          {t("About")}
         </Menu.MenuItem>
       </Menu>
     </nav>
@@ -119,7 +121,7 @@ function Workspace({ serverVersion }: { serverVersion: BuildInfo }) {
                     void refresh().catch(() => {});
                   }}
                 >
-                  Retry metadata
+                  {t("Retry metadata")}
                 </Button>
               }
             />
@@ -130,7 +132,7 @@ function Workspace({ serverVersion }: { serverVersion: BuildInfo }) {
             <Route
               path="/analysis"
               element={
-                <Suspense fallback={<Loading text="Loading analysis…" />}>
+                <Suspense fallback={<Loading text={t("Loading analysis…")} />}>
                   <AnalysisPage />
                 </Suspense>
               }
@@ -183,7 +185,8 @@ function Application() {
     };
   }, [address, connection?.address]);
   if (location.pathname === "/server") return <ServerPage onConnected={setConnection} />;
-  if (connection?.address !== address) return <Loading fullscreen text="Connecting to Fortuna…" />;
+  if (connection?.address !== address)
+    return <Loading fullscreen text={t("Connecting to Fortuna…")} />;
   if (!serverAddress() || connection.version === null) return <Navigate to="/server" replace />;
   if (!identity)
     return location.pathname === "/login" ? <AuthPage /> : <Navigate to="/login" replace />;
@@ -195,8 +198,12 @@ function Application() {
 }
 
 export default function App() {
+  const language = useLanguage();
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
   return (
-    <ConfigProvider globalConfig={enUS}>
+    <ConfigProvider globalConfig={language === "zh-CN" ? zhCN : enUS}>
       <HashRouter>
         <Application />
       </HashRouter>
