@@ -278,14 +278,14 @@ try {
   await expect(page.locator(".t-table").first().locator("tbody tr")).toHaveCount(1);
   await page.screenshot({ path: "../user-data/report-desktop.png", fullPage: true });
   await page.getByText("Analysis", { exact: true }).first().click();
-  await page.locator(".chart canvas").waitFor();
+  const stackCanvas = page.getByRole("img", { name: /stacked by asset type/ }).locator("canvas");
+  await stackCanvas.waitFor();
+  await page.getByRole("img", { name: "Report Sankey by asset type" }).locator("canvas").waitFor();
   await page.getByRole("cell", { name: "140.00 USD", exact: true }).waitFor();
   await page.screenshot({ path: "../user-data/analysis-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
-  await expect
-    .poll(() => page.locator(".chart canvas").evaluate((canvas) => canvas.clientWidth))
-    .toBeLessThan(390);
+  await expect.poll(() => stackCanvas.evaluate((canvas) => canvas.clientWidth)).toBeLessThan(390);
   await page.screenshot({ path: "../user-data/analysis-mobile.png", fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${frontend}/#/reports/${reportId}`);
@@ -300,6 +300,24 @@ try {
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await page.getByRole("button", { name: "Add record", exact: true }).click();
   await dialog.getByRole("switch", { name: "Quick insert mode" }).click();
+  await formItem(dialog, /^Content$/)
+    .getByRole("textbox")
+    .focus();
+  for (const [field, option] of [
+    ["Asset type", "Deposit"],
+    ["Institution", "Test Bank"],
+    ["Currency", "USD"],
+  ]) {
+    await page.keyboard.press("Tab");
+    await expect(formItem(dialog, new RegExp(`^${field}$`)).getByRole("textbox")).toBeFocused();
+    await expect(
+      page.locator(".t-select__dropdown:visible .t-select-option").filter({ hasText: option }),
+    ).toBeVisible();
+    await expect(page.locator(".t-select__dropdown:visible")).toHaveCount(1);
+  }
+  await page.keyboard.press("Tab");
+  await expect(formItem(dialog, /^Amount$/).locator(":focus")).toHaveCount(1);
+  await expect(page.locator(".t-select__dropdown:visible")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Save record" }).click();
   await expect(dialog.locator(".t-form__controls.t-is-warning")).toHaveCount(3);
   await choose(dialog, /^Asset type$/, "Deposit");

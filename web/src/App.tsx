@@ -6,6 +6,7 @@ import enUS from "tdesign-react/es/locale/en_US";
 import {
   ChartLineIcon,
   FileIcon,
+  InfoCircleIcon,
   LogoutIcon,
   MenuFoldIcon,
   MenuUnfoldIcon,
@@ -20,7 +21,8 @@ import { action } from "./helpers";
 import { AuthPage, ServerPage } from "./pages/Access";
 import { SettingsPage } from "./pages/Settings";
 import { ReportsPage, ReportPage } from "./pages/Reports";
-import Version from "./version";
+import { AboutPage } from "./pages/About";
+import type { BuildInfo } from "./version";
 import "./App.css";
 
 const AnalysisPage = lazy(() =>
@@ -91,12 +93,15 @@ function WorkspaceMenu() {
         <Menu.MenuItem value="settings" href="#/settings" icon={<SettingIcon />}>
           Settings
         </Menu.MenuItem>
+        <Menu.MenuItem value="about" href="#/about" icon={<InfoCircleIcon />}>
+          About
+        </Menu.MenuItem>
       </Menu>
     </nav>
   );
 }
 
-function Workspace({ serverVersion }: { serverVersion: string }) {
+function Workspace({ serverVersion }: { serverVersion: BuildInfo }) {
   const { error, refresh } = useMetadata();
   return (
     <Layout direction="horizontal" className="app-layout">
@@ -131,12 +136,10 @@ function Workspace({ serverVersion }: { serverVersion: string }) {
               }
             />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/about" element={<AboutPage server={serverVersion} />} />
             <Route path="*" element={<Navigate to="/reports" replace />} />
           </Routes>
         </Layout.Content>
-        <Layout.Footer className="app-footer">
-          Fortuna Web {Version.tag} · Server {serverVersion || "—"}
-        </Layout.Footer>
       </Layout>
     </Layout>
   );
@@ -147,7 +150,7 @@ function Application() {
   const location = useLocation();
   const [identity, setIdentity] = useState(authToken());
   const [address, setAddress] = useState(serverAddress() || window.location.origin);
-  const [connection, setConnection] = useState<{ address: string; version: string | null }>();
+  const [connection, setConnection] = useState<{ address: string; version: BuildInfo | null }>();
   useEffect(() => {
     const session = () => {
       setIdentity(authToken());

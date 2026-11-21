@@ -5,11 +5,12 @@ import { Alert, Button, Card, Form, Input, Radio, Space } from "tdesign-react";
 import { ServerIcon, WalletIcon } from "tdesign-icons-react";
 import { authToken, ping, request, serverAddress, setServer, setToken } from "../api";
 import type { Account } from "../types";
+import type { BuildInfo } from "../version";
 
 export function ServerPage({
   onConnected,
 }: {
-  onConnected: (server: { address: string; version: string }) => void;
+  onConnected: (server: { address: string; version: BuildInfo }) => void;
 }) {
   const navigate = useNavigate();
   const [address, setAddress] = useState(serverAddress() || window.location.origin);

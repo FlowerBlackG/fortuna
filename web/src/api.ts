@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import axios from "axios";
 import type { IResponse } from "./response";
+import type { BuildInfo } from "./version";
 
 const SERVER_KEY = "fortuna.server";
 const TOKEN_KEY = "fortuna.token";
@@ -36,15 +37,15 @@ export function normalizeServer(value: string) {
   url.search = "";
   return url.toString().replace(/\/+$/, "");
 }
-export async function ping(address: string) {
-  const response = await axios.get<IResponse<{ app: string; version: string }>>(
-    `${normalizeServer(address)}/api/ping`,
-    { timeout: 6000 },
-  );
+export async function ping(address: string): Promise<BuildInfo> {
+  const response = await axios.get<
+    IResponse<{ app: string; version: string; version_code?: number; build_time?: string }>
+  >(`${normalizeServer(address)}/api/ping`, { timeout: 6000 });
   if (response.data?.code !== 200 || response.data.data?.app !== "Fortuna") {
     throw new Error("This address did not respond as a Fortuna server");
   }
-  return response.data.data.version;
+  const { version, version_code, build_time } = response.data.data;
+  return { tag: version, code: version_code, buildTime: build_time };
 }
 export class ApiError extends Error {
   code: number;

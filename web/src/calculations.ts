@@ -137,11 +137,13 @@ export function convertTotals(amounts: CurrencyTotal[], rates: ExchangeRate[], c
   return Number.isFinite(value) ? value : null;
 }
 
+export type GroupBy = "asset_type_id" | "institution_id" | "currency_id";
+
 export function distribution(
   records: AssetRecord[],
   rates: ExchangeRate[],
   currency: string,
-  group: "asset_type_id" | "institution_id",
+  group: GroupBy,
 ) {
   const values = new Map<string, number>();
   let missing = 0;

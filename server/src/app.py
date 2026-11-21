@@ -20,7 +20,7 @@ from entities import (AssetType, Currency, CurrencyExchangeRate, Entity, Institu
                       ReportRecord, Repository, UserAccount, UserSettings)
 from events import OnReportDeletion, OnUserDeletion, deletion_events
 from response import ApiError, ApiResponse, IResponse
-from version import VERSION_TAG
+from version import BUILD_TIME, VERSION_CODE, VERSION_TAG
 
 type Resource = AssetType | Currency | Institution | Report | ReportRecord
 type JsonObject = dict[str, Any]
@@ -230,7 +230,8 @@ def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
 
     @app.get("/api/ping")
     def ping() -> ApiResponse:
-        return IResponse.ok({"app": "Fortuna", "version": VERSION_TAG})
+        return IResponse.ok({"app": "Fortuna", "version": VERSION_TAG,
+                             "version_code": VERSION_CODE, "build_time": BUILD_TIME})
 
     @app.post("/api/account")
     def register() -> ApiResponse:

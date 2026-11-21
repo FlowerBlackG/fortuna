@@ -114,6 +114,15 @@ try {
   await page.getByRole("cell", { name: "156.00 CNY", exact: true }).waitFor();
   const initialPings = pings;
   const nav = page.getByRole("navigation", { name: "Workspace" });
+  await nav.getByRole("link", { name: "About", exact: true }).click();
+  await page.getByRole("heading", { name: "Fortuna", exact: true }).waitFor();
+  const build = await api("GET", "/ping");
+  await expect(
+    page.getByText(`${build.version} (${build.version_code})`, { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: "Server build" })).toContainText(
+    /\d{4}-\d{2}-\d{2} \d{2}:\d{2} (CST|[+-]\d{1,2}(:\d{2})?)/,
+  );
   await nav.getByRole("button", { name: "Collapse sidebar" }).click();
   await nav.getByRole("link", { name: "Settings", exact: true }).click();
   await nav.getByRole("button", { name: "Expand sidebar" }).click();
@@ -241,8 +250,9 @@ try {
   await expect(page.getByText("0 reports · Dashed line: total")).toBeVisible();
   await page.getByRole("button", { name: "Last 1 year", exact: true }).click();
   const through = await page.getByPlaceholder("Through date").inputValue();
-  const from = await page.getByPlaceholder("From date").inputValue();
-  assert.equal(Number(from.slice(0, 4)), Number(through.slice(0, 4)) - 1);
+  await expect(page.getByPlaceholder("From date")).toHaveValue(
+    new RegExp(`^${Number(through.slice(0, 4)) - 1}-`),
+  );
   await page.getByRole("button", { name: "All time", exact: true }).click();
   await page
     .getByRole("img", {
@@ -269,6 +279,39 @@ try {
     (await chartOptions())[0].series[0].data.map(([timestamp]) => timestamp),
     reports.map((report) => Date.parse(report.report_time)),
   );
+  for (const [label, names] of Object.entries({
+    Institution: ["Bank", "Broker"],
+    Currency: ["USD", "CNY"],
+  })) {
+    await page.getByText(label, { exact: true }).click();
+    const [stack, sankey] = await chartOptions();
+    assert.deepEqual(
+      stack.series.map((s) => s.name),
+      [...names, "Total"],
+    );
+    assert.deepEqual(
+      sankey.series[0].links.map((link) => link.value),
+      [36, 30],
+    );
+    const canvas = page.getByRole("img", {
+      name: `Effective asset value stacked by ${label.toLowerCase()} over time`,
+    });
+    const [x, y] = await canvas.evaluate(async (element) => {
+      const { getInstanceByDom } = await import("/node_modules/.vite/deps/echarts_core.js");
+      return getInstanceByDom(element).convertToPixel({ gridIndex: 0 }, [
+        Date.parse("2020-01-01T06:00:00Z"),
+        20,
+      ]);
+    });
+    await canvas.hover({ position: { x, y } });
+    await expect(page.locator("body > .analysis-tooltip:visible")).toContainText(
+      `${names[0]}: 36.00 CNY`,
+    );
+    await expect(page.locator("body > .analysis-tooltip:visible")).toContainText(
+      "Total: 66.00 CNY",
+    );
+  }
+  await page.getByText("Asset type", { exact: true }).click();
   await page.getByPlaceholder("All institutions", { exact: true }).click();
   await page
     .locator(".t-select-option")

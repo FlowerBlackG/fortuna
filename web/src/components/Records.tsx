@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-import { useRef, useState } from "react";
+import { useRef, useState, type ComponentRef, useLayoutEffect } from "react";
 import {
   Alert,
   Button,
@@ -281,6 +281,13 @@ export function RecordTable({
   const fields = customFields(
     metadata.asset_types.find((item) => item.asset_type_id === assetType)?.custom_fields,
   );
+  const typeNames = new Map(metadata.asset_types.map((item) => [item.asset_type_id, item.name]));
+  const institutionNames = new Map(
+    metadata.institutions.map((item) => [item.institution_id, item.name]),
+  );
+  const typeName = (row: AssetRecord) => typeNames.get(row.asset_type_id) ?? "Missing asset type";
+  const institutionName = (row: AssetRecord) =>
+    institutionNames.get(row.institution_id) ?? "Missing institution";
   function money(record: AssetRecord, effective: boolean) {
     const amount = record.amount * (effective ? record.effective_rate : 1);
     const name =
@@ -314,6 +321,7 @@ export function RecordTable({
       colKey: "asset_type_id",
       title: "Asset type",
       width: 140,
+      sorter: (a, b) => typeName(a).localeCompare(typeName(b)),
       cell: ({ row }) => {
         const type = metadata.asset_types.find((item) => item.asset_type_id === row.asset_type_id);
         return type ? (
@@ -334,9 +342,8 @@ export function RecordTable({
       colKey: "institution_id",
       title: "Institution",
       width: 140,
-      cell: ({ row }) =>
-        metadata.institutions.find((item) => item.institution_id === row.institution_id)?.name ||
-        "Missing institution",
+      sorter: (a, b) => institutionName(a).localeCompare(institutionName(b)),
+      cell: ({ row }) => institutionName(row),
     },
     {
       colKey: "amount",
@@ -481,6 +488,14 @@ export function RecordEditor({
   const [quickInsert, setQuickInsert] = useState(false);
   const [kept, setKept] = useState<Set<string | number>>(() => new Set());
   const [saving, setSaving] = useState(false);
+  const contentInput = useRef<ComponentRef<typeof Textarea>>(null);
+  const focusNextRecord = useRef(false);
+  useLayoutEffect(() => {
+    if (!saving && focusNextRecord.current) {
+      contentInput.current?.textareaElement.focus();
+      focusNextRecord.current = false;
+    }
+  }, [saving]);
   const submitting = useRef(false);
   const [attempted, setAttempted] = useState(false);
   const assetType = metadata.asset_types.find((item) => item.asset_type_id === draft.asset_type_id);
@@ -510,6 +525,9 @@ export function RecordEditor({
     if (!quickInsert) return null;
     return (
       <Checkbox
+        ref={(label) => {
+          if (label) label.tabIndex = -1;
+        }}
         title={`Keep ${label}`}
         checked={kept.has(key)}
         onChange={(checked) => {
@@ -562,6 +580,7 @@ export function RecordEditor({
     setSaving(true);
     try {
       if (await onSave(record, true)) {
+        focusNextRecord.current = true;
         setAttempted(false);
         const reset = Object.entries(recordDefaults).filter(([key]) => !kept.has(key));
         setDraft({
@@ -601,12 +620,22 @@ export function RecordEditor({
         )}
         <Form labelAlign="top">
           <div className={quickInsert ? "form-grid quick-insert-grid" : "form-grid"}>
+            <EditorField label="Content" className="wide">
+              <Textarea
+                ref={contentInput}
+                autofocus
+                value={draft.content}
+                onChange={(content) => update({ content })}
+                autosize={{ minRows: 2, maxRows: 6 }}
+              />
+              {keepBox("content", "content")}
+            </EditorField>
             <EditorField
               label="Asset type"
               warning={attempted && invalid.type && "Choose an asset type"}
             >
               <Select
-                autofocus
+                popupProps={{ trigger: "focus" }}
                 filterable
                 value={draft.asset_type_id}
                 options={metadata.asset_types.map((item) => ({
@@ -623,6 +652,7 @@ export function RecordEditor({
             >
               <Select
                 filterable
+                popupProps={{ trigger: "focus" }}
                 value={draft.institution_id}
                 options={metadata.institutions.map((item) => ({
                   value: item.institution_id,
@@ -638,6 +668,7 @@ export function RecordEditor({
             >
               <Select
                 filterable
+                popupProps={{ trigger: "focus" }}
                 value={draft.currency_id}
                 options={metadata.currencies.map((item) => ({
                   value: item.currency_id,
@@ -665,14 +696,6 @@ export function RecordEditor({
                 }
               />
               {keepBox("effective_rate", "effective rate")}
-            </EditorField>
-            <EditorField label="Content" className="wide">
-              <Textarea
-                value={draft.content}
-                onChange={(content) => update({ content })}
-                autosize={{ minRows: 2, maxRows: 6 }}
-              />
-              {keepBox("content", "content")}
             </EditorField>
             {[...fields]
               .sort((a, b) => a.display_order - b.display_order)

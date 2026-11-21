@@ -21,6 +21,22 @@
   font-size: 22px;
   letter-spacing: -0.6px;
 }
+.about-card {
+  max-width: 460px;
+  margin: clamp(12px, 6vh, 64px) auto;
+}
+.about-card header {
+  text-align: center;
+  color: var(--td-brand-color);
+  margin: 8px 0 28px;
+}
+.about-card h1 {
+  margin: 8px 0;
+  color: var(--td-text-color-primary);
+}
+.about-card td {
+  font-variant-numeric: tabular-nums;
+}
 .muted {
   color: #6b7972;
 }
@@ -30,11 +46,6 @@
   max-width: 1480px;
   margin: 0 auto;
   padding: 28px 32px;
-}
-.app-footer {
-  text-align: center;
-  color: #7c8982;
-  padding: 20px;
 }
 .page-heading {
   display: flex;
@@ -156,6 +167,32 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+}
+.analysis-tooltip {
+  max-width: min(28rem, calc(100vw - 24px));
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.sankey-scroll {
+  overflow-x: auto;
+}
+.sankey-headings {
+  position: relative;
+  height: 1.5em;
+}
+.sankey-headings span {
+  position: absolute;
+  transform: translateX(-50%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sankey-headings span:first-child {
+  transform: none;
+}
+.sankey-headings span:last-child {
+  transform: translateX(-100%);
 }
 @media (max-width: 900px) {
   .distribution-grid {

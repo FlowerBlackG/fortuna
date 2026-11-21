@@ -16,7 +16,7 @@ import {
   Table,
 } from "tdesign-react";
 import type { PrimaryTableCol } from "tdesign-react";
-import { DeleteIcon, RefreshIcon } from "tdesign-icons-react";
+import { DeleteIcon, DownloadIcon, RefreshIcon } from "tdesign-icons-react";
 import { request } from "../api";
 import { action, settingsObject, showError } from "../helpers";
 import { useLoad } from "../useLoad";
@@ -34,12 +34,50 @@ import {
 import { emptyFilters, filterRecords, useDefaultCurrency, usePrecision } from "../recordState";
 import type { RecordDraft, RecordStatus } from "../components/Records";
 import { useTableSort } from "../tableState";
+import type { ReportExport } from "../reportExport";
 
 const ReportDistribution = lazy(() =>
   import("../components/ReportDistribution").then((module) => ({
     default: module.ReportDistribution,
   })),
 );
+
+function ExportButton({
+  getInput,
+  disabled,
+  compact,
+}: {
+  getInput: () => ReportExport | Promise<ReportExport>;
+  disabled?: boolean;
+  compact?: boolean;
+}) {
+  const [loading, setLoading] = useState(false);
+  async function download() {
+    setLoading(true);
+    try {
+      const [{ downloadReport }, input] = await Promise.all([
+        import("../reportExport"),
+        getInput(),
+      ]);
+      await downloadReport(input);
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <Button
+      variant={compact ? "text" : "outline"}
+      icon={<DownloadIcon />}
+      aria-label="Export report"
+      title="Export report"
+      loading={loading}
+      disabled={disabled}
+      onClick={() => action(download)}
+    >
+      {compact ? undefined : "Export"}
+    </Button>
+  );
+}
 
 export function ReportsPage() {
   const navigate = useNavigate();
@@ -99,25 +137,44 @@ export function ReportsPage() {
       title: "Actions",
       width: 110,
       cell: ({ row }) => (
-        <Popconfirm
-          content="Delete this report, its records, and its exchange rates?"
-          onConfirm={() =>
-            action(async () => {
-              await request("DELETE", `/reports/${row.report_id}`);
-              state.setData((current) =>
-                current?.filter((item) => item.report_id !== row.report_id),
-              );
-            })
-          }
-        >
-          <Button
-            theme="danger"
-            variant="text"
-            icon={<DeleteIcon />}
-            aria-label="Delete"
-            title="Delete"
+        <Space size="small">
+          <ExportButton
+            compact
+            getInput={async () => {
+              const [report, records, metadata] = await Promise.all([
+                request<Report>("GET", `/reports/${row.report_id}`),
+                request<AssetRecord[]>("GET", `/records?report_id=${row.report_id}`),
+                refresh(),
+              ]);
+              return {
+                report,
+                records,
+                metadata,
+                currency: defaultCurrency?.currency_id ?? "",
+                decimals,
+              };
+            }}
           />
-        </Popconfirm>
+          <Popconfirm
+            content="Delete this report, its records, and its exchange rates?"
+            onConfirm={() =>
+              action(async () => {
+                await request("DELETE", `/reports/${row.report_id}`);
+                state.setData((current) =>
+                  current?.filter((item) => item.report_id !== row.report_id),
+                );
+              })
+            }
+          >
+            <Button
+              theme="danger"
+              variant="text"
+              icon={<DeleteIcon />}
+              aria-label="Delete"
+              title="Delete"
+            />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -393,6 +450,19 @@ function ReportDetail({ reportId }: { reportId: string }) {
           <span className="muted">
             {visible.length} of {records.length} records
           </span>
+          {state.data && (
+            <ExportButton
+              disabled={unsynced || state.loading}
+              getInput={() => ({
+                report: { ...state.data!.report, title, exchange_rates: rates },
+                records: visible,
+                metadata,
+                currency,
+                decimals,
+                assetType: filters.assetTypes.length === 1 ? filters.assetTypes[0] : undefined,
+              })}
+            />
+          )}
           {editable && (
             <Button shape="round" onClick={() => open()}>
               Add record

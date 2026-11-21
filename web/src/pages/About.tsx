@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MulanPSL-2.0
+import { WalletIcon } from "tdesign-icons-react";
+import { Card, Descriptions } from "tdesign-react";
+import Version, { type BuildInfo } from "../version";
+
+function buildTime(value?: string) {
+  const match = value?.match(
+    /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/,
+  );
+  if (!match) return "Unavailable";
+  const [, date, time, offset] = match;
+  const zone =
+    offset === "+08:00"
+      ? "CST"
+      : offset === "Z"
+        ? "+0"
+        : offset.replace(/^([+-])0/, "$1").replace(/:00$/, "");
+  return `${date} ${time} ${zone}`;
+}
+
+export function AboutPage({ server }: { server: BuildInfo }) {
+  const builds: [string, BuildInfo][] = [
+    ["Server", server],
+    ["Web", Version],
+  ];
+  return (
+    <Card className="about-card">
+      <header>
+        <WalletIcon size="48" />
+        <h1>Fortuna</h1>
+      </header>
+      <Descriptions
+        column={1}
+        tableLayout="auto"
+        colon={false}
+        items={builds.flatMap(([name, build]) => [
+          {
+            label: `${name} version`,
+            content: build.code == null ? build.tag : `${build.tag} (${build.code})`,
+          },
+          { label: `${name} build`, content: buildTime(build.buildTime) },
+        ])}
+      />
+    </Card>
+  );
+}

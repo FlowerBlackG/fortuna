@@ -1,12 +1,29 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { useState } from "react";
-import { Alert, Button, Card, DatePicker, Loading, Select, Space, Table } from "tdesign-react";
+import {
+  Alert,
+  Button,
+  Card,
+  DatePicker,
+  Loading,
+  Radio,
+  Select,
+  Space,
+  Table,
+} from "tdesign-react";
 import { RefreshIcon } from "tdesign-icons-react";
 import { request } from "../api";
 import { useLoad } from "../useLoad";
 import { useMetadata } from "../metadata";
-import { chartCurrency, distribution, number, reportTitle, totals } from "../calculations";
-import { Chart } from "../components/Chart";
+import {
+  chartCurrency,
+  distribution,
+  number,
+  reportTitle,
+  totals,
+  type GroupBy,
+} from "../calculations";
+import { ReportSankey, StackedChart } from "../components/AnalysisCharts";
 import { FilterControls, ValuationControls } from "../components/Records";
 import { emptyFilters, filterRecords, useDefaultCurrency, usePrecision } from "../recordState";
 import type { AssetRecord, Report } from "../types";
@@ -14,6 +31,12 @@ import type { AssetRecord, Report } from "../types";
 function localDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
+
+const grouping = {
+  asset_type_id: "Asset type",
+  institution_id: "Institution",
+  currency_id: "Currency",
+};
 
 export function AnalysisPage() {
   const { metadata, refresh, ensure } = useMetadata();
@@ -27,6 +50,7 @@ export function AnalysisPage() {
     return { reports, records };
   }, []);
   const [filters, setFilters] = useState(emptyFilters);
+  const [groupBy, setGroupBy] = useState<GroupBy>("asset_type_id");
   const [selectedCurrency, setCurrency] = useDefaultCurrency();
   const currency = chartCurrency(metadata, selectedCurrency);
   const currencyName =
@@ -50,76 +74,47 @@ export function AnalysisPage() {
     if (!grouped.has(record.report_id)) grouped.set(record.report_id, []);
     grouped.get(record.report_id)!.push(record);
   }
-  const points = reports.map((report) => ({
-    report,
-    ...totals(grouped.get(report.report_id) || [], report.exchange_rates, currency),
-    groups: distribution(
-      grouped.get(report.report_id) || [],
-      report.exchange_rates,
-      currency,
-      "asset_type_id",
-    ),
-  }));
-  const seriesIds = [
-    ...new Set(
-      reports.flatMap((report) =>
-        (grouped.get(report.report_id) || []).map((record) => record.asset_type_id),
-      ),
-    ),
-  ];
+  const points = reports.map((report) => {
+    const rows = grouped.get(report.report_id) || [];
+    const result = totals(rows, report.exchange_rates, currency);
+    const { values, missing } = distribution(rows, report.exchange_rates, currency, groupBy);
+    return {
+      report,
+      ...result,
+      missing,
+      title: reportTitle(report),
+      time: Date.parse(report.report_time),
+      values,
+      total: missing ? null : (result.amounts.get(currency)?.effective ?? 0),
+    };
+  });
   const missing = points.reduce((count, point) => count + point.missing, 0);
-  const chartOptions = {
-    animation: false,
-    color: ["#28765a", "#5c84c3", "#c99736", "#a775aa", "#64a6a2"],
-    tooltip: {
-      trigger: "axis",
-      valueFormatter: (value: number) => `${number(value, decimals)} ${currencyName}`,
-    },
-    legend: { top: 0, type: "scroll" },
-    grid: { left: 80, right: 30, top: 50, bottom: 80 },
-    xAxis: { type: "time", splitNumber: 4, axisLabel: { hideOverlap: true } },
-    yAxis: { type: "value", name: currencyName },
-    dataZoom: [{ type: "inside" }, { type: "slider", bottom: 8 }],
-    series: [
-      ...seriesIds.map((id) => ({
-        id,
-        name:
-          metadata.asset_types.find((item) => item.asset_type_id === id)?.name ||
-          "Missing asset type",
-        type: "line",
-        stack: "assets",
-        stackStrategy: "samesign",
-        areaStyle: { opacity: 0.6 },
-        ...(metadata.asset_types.some(
-          (item) => item.asset_type_id === id && /^[0-9A-F]{6}$/.test(item.color),
-        )
-          ? {
-              itemStyle: {
-                color: `#${metadata.asset_types.find((item) => item.asset_type_id === id)!.color}`,
-              },
-            }
-          : {}),
-        connectNulls: false,
-        symbolSize: 7,
-        data: points.map((point) => [
-          Date.parse(point.report.report_time),
-          point.missing ? null : point.groups.values.get(id) || 0,
-        ]),
-      })),
-      {
-        id: "total",
-        name: "Total",
-        type: "line",
-        connectNulls: false,
-        symbolSize: 6,
-        itemStyle: { color: "#24352f" },
-        lineStyle: { width: 2, type: "dashed" },
-        data: points.map((point) => [
-          Date.parse(point.report.report_time),
-          point.missing ? null : point.amounts.get(currency)?.effective || 0,
-        ]),
-      },
-    ],
+  const groupLabel = grouping[groupBy].toLowerCase();
+  const ids = new Set(points.flatMap((p) => [...p.values.keys()]));
+  const labels = new Map<string, { name: string; color?: string }>(
+    groupBy === "asset_type_id"
+      ? metadata.asset_types.map((item) => [item.asset_type_id, item])
+      : groupBy === "institution_id"
+        ? metadata.institutions.map((item) => [item.institution_id, item])
+        : metadata.currencies.map((item) => [item.currency_id, item]),
+  );
+  const groups = [...ids].map((id, index) => {
+    const item = labels.get(id);
+    return {
+      id,
+      name: item?.name || `Missing ${groupLabel}`,
+      color:
+        item?.color && /^[0-9a-f]{6}$/i.test(item.color)
+          ? `#${item.color}`
+          : `hsl(${Math.round((156 + index * 137.5) % 360)}, 40%, 48%)`,
+    };
+  });
+  const chartProps = {
+    points,
+    groups,
+    groupLabel,
+    currencyName,
+    money: (value: number) => `${number(value, decimals)} ${currencyName}`,
   };
   function selectRange(range: "ytd" | "year") {
     const today = new Date();
@@ -207,6 +202,16 @@ export function AnalysisPage() {
           singleCurrency
         />
         <FilterControls value={filters} onChange={setFilters} />
+        <div className="toolbar">
+          <span>Group by</span>
+          <Radio.Group
+            aria-label="Group charts by"
+            variant="default-filled"
+            value={groupBy}
+            onChange={(value) => setGroupBy(value as GroupBy)}
+            options={Object.entries(grouping).map(([value, label]) => ({ value, label }))}
+          />
+        </div>
         {from && through && from > through && (
           <Alert theme="warning" message="The start date is after the end date." />
         )}
@@ -217,14 +222,14 @@ export function AnalysisPage() {
           />
         )}
         <Loading loading={state.loading}>
-          <Chart
-            option={chartOptions}
-            label="Effective asset value stacked by asset type over time"
-          />
+          <StackedChart {...chartProps} />
         </Loading>
         <Space>
           <span className="muted">{reports.length} reports · Dashed line: total</span>
         </Space>
+      </Card>
+      <Card title="Report Sankey">
+        <ReportSankey {...chartProps} />
       </Card>
       <Card title="Report values">
         <Table

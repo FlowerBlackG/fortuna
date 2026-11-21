@@ -1,3 +1,4 @@
 # SPDX-License-Identifier: MulanPSL-2.0
 VERSION_TAG = "0.1.0"
 VERSION_CODE = 1
+BUILD_TIME = "2026-11-21T15:09:00+08:00"
