@@ -65,6 +65,18 @@ async function selectCurrency(name) {
     .click();
 }
 
+function overviewRows(sheet, title) {
+  const rows = sheet.getRows(1, sheet.rowCount);
+  const heading = rows.find((row) => row.getCell(1).text === title);
+  assert.ok(heading);
+  const table = [];
+  for (const row of rows.slice(heading.number)) {
+    if (!row.hasValues) break;
+    table.push(row.values.slice(1).map((v) => v?.richText?.map((run) => run.text).join("") ?? v));
+  }
+  return table;
+}
+
 try {
   token = (await api("POST", "/account", { username: `regression-${Date.now()}`, password })).token;
   const usd = await api("POST", "/currencies", { name: "USD" });
@@ -494,9 +506,22 @@ try {
     assert.equal(sheet.getCell("A1").font.name, "Latin Text");
     assert.equal(sheet.getCell("A2").font.name, "CJK Text");
     const rows = sheet.getRows(1, sheet.rowCount);
-    const summary = rows.find((r) => r.getCell(2).text === "有效价值");
-    assert.deepEqual(summary.values.slice(1), ["货币", "有效价值"]);
-    assert.deepEqual(sheet.getRow(summary.number + 1).values.slice(1), ["CNY", 156]);
+    const groups = {
+      按机构: [[institution, 156, 60, 12]],
+      按资产类型: [
+        ["Cash", 96, 0, 12],
+        ["Deposit", 60, 60, 0],
+      ],
+      按货币: [
+        ["CNY", 60, 60, 0],
+        ["USD美元", 96, 0, 12],
+      ],
+    };
+    assert.deepEqual(overviewRows(sheet, "概览"), [
+      [sheet.name.slice(1), "以CNY计的有效价值", "CNY", "USD美元"],
+      ["合计", 156, 60, 12],
+      ...groups[sheet.name],
+    ]);
     const details = rows.find((r) => r.getCell(1).text === "内容");
     assert.deepEqual(
       [4, 5, 6].map((col) => details.getCell(col).text),
@@ -506,13 +531,16 @@ try {
     const referenceCol = details.values.indexOf("Reference");
     assert.ok(referenceCol > 0);
     assert.equal(details.values.filter((name) => String(name).includes("Reference")).length, 1);
-    const item = rows.find((r) => r.getCell(1).text === "Cash" && r.getCell(4).value === 12);
+    const detailRows = rows.slice(details.number);
+    const item = detailRows.find((r) => r.getCell(1).text === "Cash" && !r.getCell(1).isMerged);
     assert.equal(item.getCell(4).font.name, "Latin Mono");
     assert.equal(item.getCell(5).value, 1);
     assert.equal(item.getCell(6).text, "12.00 USD美元 (96.00 CNY)");
     assert.ok(item.values.includes("cash ref"));
     assert.equal(item.getCell(referenceCol).text, "cash ref");
-    const deposit = rows.find((r) => r.getCell(1).text === "Deposit" && !r.getCell(1).isMerged);
+    const deposit = detailRows.find(
+      (r) => r.getCell(1).text === "Deposit" && !r.getCell(1).isMerged,
+    );
     assert.deepEqual(
       [4, 5, 6].map((i) => deposit.getCell(i).value),
       [120, 0.5, 60],
@@ -527,7 +555,7 @@ try {
   }
   const cashRow = book.worksheets[0]
     .getRows(1, book.worksheets[0].rowCount)
-    .find((r) => r.getCell(4).value === 12);
+    .find((r) => r.getCell(1).text === "Cash" && r.getCell(4).value === 12);
   assert.deepEqual(
     cashRow.getCell(3).value.richText.map((r) => [r.text, r.font.name]),
     [
@@ -577,6 +605,12 @@ try {
     ["By asset type", "Growth by asset type"],
   );
   assert.equal(englishBook.worksheets[0].getCell("A2").text, "Report time");
+  assert.deepEqual(overviewRows(englishBook.worksheets[0], "Overview"), [
+    ["Asset type", "CNY", "USD美元"],
+    ["Total", 60, 12],
+    ["Cash", 0, 12],
+    ["Deposit", 60, 0],
+  ]);
   const growth = englishBook.worksheets[1];
   assert.match(growth.getCell("A4").text, /Change since Snapshot 1/);
   const growthColumns = growth.getRow(5);

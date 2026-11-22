@@ -68,25 +68,36 @@ function reportSections({
     metadata.institutions.map((item) => [item.institution_id, item.name]),
   );
   const rates = report.exchange_rates;
-  const summary = totals(records, rates, currency);
-  const sections: Section[] = [
-    {
-      title: t("Exchange rates"),
-      mono: [0, 1],
-      columns: [t("Currency pair"), t("Rate")],
-      rows: rates.map((r) => [
-        `${currencyName(r.numerator_currency_id)} / ${currencyName(r.denominator_currency_id)}`,
-        r.exchange_rate,
-      ]),
-    },
-    {
-      title: summary.missing ? t("Totals (partial)") : t("Totals"),
-      columns: [t("Currency"), t("Effective value")],
-      amounts: [1],
-      mono: [0, 1],
-      rows: [...summary.amounts].map(([id, value]) => [currencyName(id), value]),
-    },
+  const exchangeRates: Section = {
+    title: t("Exchange rates"),
+    mono: [0, 1],
+    columns: [t("Currency pair"), t("Rate")],
+    rows: rates.map((r) => [
+      `${currencyName(r.numerator_currency_id)} / ${currencyName(r.denominator_currency_id)}`,
+      r.exchange_rate,
+    ]),
+  };
+  const currencyIds = [...new Set(records.map((record) => record.currency_id))].sort((a, b) =>
+    currencyName(a).localeCompare(currencyName(b), language),
+  );
+  const moneyColumns = [
+    ...(currency ? [t("Effective value in {0}", currencyName(currency))] : []),
+    ...currencyIds.map(currencyName),
   ];
+  function summarize(label: string, items: typeof records) {
+    const original = totals(items, rates);
+    const converted = currency ? totals(items, rates, currency) : undefined;
+    const partial = !!(original.missing || converted?.missing);
+    const preferredValue = converted?.amounts.get(currency) ?? (items.length ? "—" : 0);
+    const present = new Set(items.map((item) => item.currency_id));
+    const row = [
+      partial ? label + t(" (partial)") : label,
+      ...(currency ? [preferredValue] : []),
+      ...currencyIds.map((id) => original.amounts.get(id) ?? (present.has(id) ? "—" : 0)),
+    ];
+    return { row, preferredValue, partial };
+  }
+  const totalRow = summarize(t("Total"), records).row;
   const fields = mergeReportFields(
     reportFields(records, metadata.asset_types).filter(
       (column) => !selectedFields || selectedFields.has(column.key),
@@ -133,7 +144,15 @@ function reportSections({
       if (!groups.has(id)) groups.set(id, []);
       groups.get(id)!.push(item);
     }
+    const overview: Section = {
+      title: t("Overview"),
+      columns: [dimensions[key], ...moneyColumns],
+      amounts: moneyColumns.map((_, i) => i + 1),
+      mono: key === "currency_id" ? [0] : [],
+      rows: [totalRow],
+    };
     const sorted = [...groups.values()]
+      .sort((a, b) => a[0].labels[key].localeCompare(b[0].labels[key], language))
       .map((items): Section => {
         const present = new Set(items.map(({ record }) => record.asset_type_id));
         const displayed = fields.filter((column) =>
@@ -152,26 +171,26 @@ function reportSections({
             ...displayed.map((column) => formatReportField(record, column, language)),
           ]),
         };
+        const subtotal = summarize(
+          section.title,
+          items.map(({ record }) => record),
+        );
+        overview.rows.push(subtotal.row);
         if (currency) {
-          const subtotal = totals(
-            items.map(({ record }) => record),
-            rates,
-            currency,
-          );
           section.footer = Array<string | number>(section.columns.length).fill("");
           section.footer[0] = t(
-            subtotal.missing ? "Partial subtotal ({0})" : "Subtotal ({0})",
+            subtotal.partial ? "Partial subtotal ({0})" : "Subtotal ({0})",
             currencyName(currency),
           );
-          section.footer[5] = subtotal.amounts.get(currency) ?? "—";
+          section.footer[5] = subtotal.preferredValue;
         }
         return section;
-      })
-      .sort((a, b) => a.title.localeCompare(b.title, language));
+      });
     return {
       name: t(label),
       sections: [
-        ...sections,
+        exchangeRates,
+        overview,
         ...(sorted.length ? sorted : [{ title: t("Records"), columns, rows: [] }]),
       ],
     };
