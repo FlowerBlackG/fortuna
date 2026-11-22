@@ -1,12 +1,55 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { useState } from "react";
-import { Checkbox, Dialog, Form, Select, Space } from "tdesign-react";
+import { Checkbox, Dialog, Form, Select, Space, Switch } from "tdesign-react";
+import { request } from "../api";
 import { getLanguage, languageOptions, t } from "../i18n";
 import { reportGroupings, type GroupBy } from "../calculations";
 import { selectString, showError } from "../helpers";
 import { reportFields } from "../reportFields";
+import { filterRecords } from "../recordState";
+import { isEarlierReport, type ReportSnapshot } from "../reportComparison";
 import type { ReportExport } from "../reportExport";
+import type { AssetRecord, Report } from "../types";
+import { useLoad } from "../useLoad";
 import { EditorField } from "./Editor";
+
+function EarlierReportPicker({
+  current,
+  value,
+  onChange,
+  busy,
+}: {
+  current: Report;
+  value: string;
+  onChange: (id: string) => void;
+  busy: boolean;
+}) {
+  const { data, loading, error } = useLoad(async () => {
+    const reports = await request<Report[]>("GET", "/reports");
+    return reports.filter((report) => isEarlierReport(report, current));
+  }, [current.report_id, current.report_time]);
+  return (
+    <EditorField
+      label={t("Earlier report")}
+      warning={error}
+      help={data && !data.length ? t("No earlier reports") : undefined}
+    >
+      <Select
+        value={value}
+        loading={loading}
+        disabled={busy || !data?.length}
+        filterable
+        onChange={(value) => onChange(selectString(value))}
+        options={data?.map((report) => ({
+          value: report.report_id,
+          label: [report.title.trim(), new Date(report.report_time).toLocaleString(getLanguage())]
+            .filter(Boolean)
+            .join(" · "),
+        }))}
+      />
+    </EditorField>
+  );
+}
 
 export function ReportExportDialog({ input, close }: { input: ReportExport; close: () => void }) {
   const [currency, setCurrency] = useState(input.currency);
@@ -17,12 +60,38 @@ export function ReportExportDialog({ input, close }: { input: ReportExport; clos
   const [fields] = useState(() => reportFields(input.records, input.metadata.asset_types));
   const [selected, setSelected] = useState(() => new Set(fields.map((f) => f.key)));
   const [busy, setBusy] = useState(false);
+  const [compare, setCompare] = useState(false);
+  const [earlierId, setEarlierId] = useState("");
+  const canExport = groupings.length > 0 && (!compare || !!earlierId);
   async function download() {
-    if (busy || !groupings.length) return;
+    if (busy || !canExport) return;
     setBusy(true);
     try {
+      let comparison: ReportSnapshot | undefined;
+      if (compare) {
+        const [report, records] = await Promise.all([
+          request<Report>("GET", `/reports/${earlierId}`),
+          request<AssetRecord[]>("GET", `/records?report_id=${earlierId}`),
+        ]);
+        if (!isEarlierReport(report, input.report)) {
+          setEarlierId("");
+          setCompare(false);
+          throw new Error(t("The selected report is no longer earlier than this report"));
+        }
+        comparison = {
+          report,
+          records: input.filters ? filterRecords(records, input.filters, input.metadata) : records,
+        };
+      }
       const { downloadReport } = await import("../reportExport");
-      await downloadReport({ ...input, currency, selectedFields: selected, language, groupings });
+      await downloadReport({
+        ...input,
+        currency,
+        selectedFields: selected,
+        language,
+        groupings,
+        comparison,
+      });
       close();
     } catch (error) {
       showError(error);
@@ -40,7 +109,7 @@ export function ReportExportDialog({ input, close }: { input: ReportExport; clos
         shape: "round",
         content: t("Export"),
         loading: busy,
-        disabled: !groupings.length,
+        disabled: !canExport,
       }}
       onConfirm={() => void download()}
       onClose={() => {
@@ -79,6 +148,25 @@ export function ReportExportDialog({ input, close }: { input: ReportExport; clos
             ]}
           />
         </EditorField>
+        <EditorField label={t("Compare with an earlier report")}>
+          <Switch
+            aria-label={t("Compare with an earlier report")}
+            value={compare}
+            disabled={busy}
+            onChange={(value) => {
+              setCompare(Boolean(value));
+              setEarlierId("");
+            }}
+          />
+        </EditorField>
+        {compare && (
+          <EarlierReportPicker
+            current={input.report}
+            value={earlierId}
+            onChange={setEarlierId}
+            busy={busy}
+          />
+        )}
         {fields.length > 0 && <h3>{t("Custom fields")}</h3>}
         {input.metadata.asset_types.map((type) => {
           const columns = fields.filter((column) => column.assetType === type);

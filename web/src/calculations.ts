@@ -158,9 +158,9 @@ export function convertTotals(amounts: CurrencyTotal[], rates: ExchangeRate[], c
 }
 
 export const reportGroupings = [
-  { key: "institution_id", label: "By institution" },
-  { key: "asset_type_id", label: "By asset type" },
-  { key: "currency_id", label: "By currency" },
+  { key: "institution_id", label: "By institution", growthLabel: "Growth by institution" },
+  { key: "asset_type_id", label: "By asset type", growthLabel: "Growth by asset type" },
+  { key: "currency_id", label: "By currency", growthLabel: "Growth by currency" },
 ] as const;
 export type GroupBy = (typeof reportGroupings)[number]["key"];
 

@@ -8,6 +8,8 @@ import ExcelJS from "exceljs";
 import fontUrl from "@expo-google-fonts/noto-sans-sc/400Regular/NotoSansSC_400Regular.ttf?url";
 import { formatReportField, mergeReportFields, reportFields } from "./reportFields";
 import { addPdfBookmarks, type PdfBookmark } from "./pdfBookmarks";
+import { compareSnapshots, type ReportSnapshot } from "./reportComparison";
+import type { RecordFilters } from "./recordState";
 import {
   formatEffectiveValue,
   number,
@@ -16,7 +18,7 @@ import {
   totals,
   type GroupBy,
 } from "./calculations";
-import type { AssetRecord, Metadata, Report } from "./types";
+import type { Metadata } from "./types";
 
 interface Section {
   title: string;
@@ -33,9 +35,8 @@ interface ReportView {
   sections: Section[];
 }
 
-export interface ReportExport {
-  report: Report;
-  records: AssetRecord[];
+export interface ReportExport extends ReportSnapshot {
+  filters?: RecordFilters;
   metadata: Metadata;
   currency: string;
   decimals: number;
@@ -44,6 +45,7 @@ export interface ReportExport {
 interface ConfiguredReport extends ReportExport {
   language: Language;
   groupings: GroupBy[];
+  comparison?: ReportSnapshot;
   selectedFields?: ReadonlySet<string>;
 }
 
@@ -55,6 +57,7 @@ function reportSections({
   decimals,
   language,
   groupings,
+  comparison,
   selectedFields,
 }: ConfiguredReport): ReportView[] {
   const t = translate.bind(null, language);
@@ -97,10 +100,15 @@ function reportSections({
   const keys = reportGroupings.map(({ key }) => key);
   const financial = [t("Amount"), t("Effective rate"), t("Effective value")];
   const amounts = [3, 5];
+  const groupName = {
+    institution_id: (id: string) => institutions.get(id) ?? t("Missing institution"),
+    asset_type_id: (id: string) => types.get(id)?.name ?? t("Missing asset type"),
+    currency_id: currencyName,
+  };
   const valued = records.map((record) => {
     const labels = {
-      institution_id: institutions.get(record.institution_id) ?? t("Missing institution"),
-      asset_type_id: types.get(record.asset_type_id)?.name ?? t("Missing asset type"),
+      institution_id: groupName.institution_id(record.institution_id),
+      asset_type_id: groupName.asset_type_id(record.asset_type_id),
       currency_id: currencyName(record.currency_id),
     };
     const effective =
@@ -115,7 +123,7 @@ function reportSections({
     };
   });
   const selectedGroups = reportGroupings.filter(({ key }) => groupings.includes(key));
-  return selectedGroups.map(({ key, label }) => {
+  const views: ReportView[] = selectedGroups.map(({ key, label }) => {
     const others = keys.filter((k) => k !== key);
     const columns = [t("Content"), ...others.map((k) => dimensions[k]), ...financial];
     const groups = new Map<string, typeof valued>();
@@ -168,6 +176,39 @@ function reportSections({
       ],
     };
   });
+  if (comparison) {
+    const previousTime = new Date(comparison.report.report_time).toLocaleString(language);
+    const previousTitle = comparison.report.title.trim();
+    const title = t(
+      "Change since {0}",
+      previousTitle ? `${previousTitle} (${previousTime})` : previousTime,
+    );
+    for (const { key, growthLabel } of selectedGroups) {
+      const table = compareSnapshots({ report, records }, comparison, key, currency);
+      const rows = table.rows.map(({ id, changes }) => [
+        groupName[key](id),
+        ...changes.map((v) => v ?? t("Unavailable")),
+      ]);
+      rows.sort((a, b) => String(a[0]).localeCompare(String(b[0]), language));
+      views.push({
+        name: t(growthLabel),
+        sections: [
+          {
+            title,
+            columns: [
+              dimensions[key],
+              ...table.currencies.map((id) =>
+                id ? t("Change ({0})", currencyName(id)) : t("Change"),
+              ),
+            ],
+            rows,
+            amounts: table.currencies.map((_, i) => i + 1),
+          },
+        ],
+      });
+    }
+  }
+  return views;
 }
 
 async function workbook(

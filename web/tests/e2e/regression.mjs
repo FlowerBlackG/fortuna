@@ -552,6 +552,19 @@ try {
     .locator(".t-select")
     .click();
   await page.locator(".t-select-option:visible").getByText("English", { exact: true }).click();
+  await api("POST", "/reports", { title: "Same time", report_time: reports[1].report_time });
+  await exportDialog.getByRole("switch").click();
+  await expect(exportDialog.getByRole("button", { name: "导出", exact: true })).toBeDisabled();
+  await formItem(exportDialog, /^较早的报告$/)
+    .locator(".t-select")
+    .click();
+  const earlierOptions = page.locator(".t-select-option:visible");
+  await expect(earlierOptions).toHaveCount(1);
+  await earlierOptions.filter({ hasText: "Snapshot 1" }).click();
+  await formItem(exportDialog, /^首选货币$/)
+    .locator(".t-select")
+    .click();
+  await page.locator(".t-select-option:visible").getByText("原币", { exact: true }).click();
   const [englishDownload] = await Promise.all([
     page.waitForEvent("download"),
     exportDialog.getByRole("button", { name: "导出", exact: true }).click(),
@@ -561,14 +574,32 @@ try {
   await englishBook.xlsx.load(englishArchive["Snapshot 2.xlsx"]);
   assert.deepEqual(
     englishBook.worksheets.map((s) => s.name),
-    ["By asset type"],
+    ["By asset type", "Growth by asset type"],
   );
   assert.equal(englishBook.worksheets[0].getCell("A2").text, "Report time");
+  const growth = englishBook.worksheets[1];
+  assert.match(growth.getCell("A4").text, /Change since Snapshot 1/);
+  const growthColumns = growth.getRow(5);
+  const headers = ["", ...[1, 2, 3].map((i) => growthColumns.getCell(i).text)];
+  const usdChange = headers.indexOf("Change (USD美元)");
+  const cnyChange = headers.indexOf("Change (CNY)");
+  assert.ok(usdChange > 0 && cnyChange > 0);
+  assert.deepEqual(
+    [6, 7].map((row) => [
+      growth.getRow(row).getCell(1).text,
+      growth.getRow(row).getCell(usdChange).value,
+      growth.getRow(row).getCell(cnyChange).value,
+    ]),
+    [
+      ["Cash", 6, 0],
+      ["Deposit", 0, 30],
+    ],
+  );
   const englishPdf = Buffer.from(englishArchive["Snapshot 2.pdf"]).toString("latin1");
   const titles = [...englishPdf.matchAll(/\/Title <FEFF([\da-f]+)>/gi)].map(([, hex]) =>
     Buffer.from(hex, "hex").swap16().toString("utf16le"),
   );
-  assert.deepEqual(titles, ["By asset type", "Cash", "Deposit"]);
+  assert.deepEqual(titles.sort(), ["By asset type", "Cash", "Deposit", "Growth by asset type"]);
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
   assert.equal(await page.evaluate(() => localStorage.getItem("fortuna.language")), "zh-CN");
   assert.deepEqual(errors, []);

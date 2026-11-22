@@ -10,6 +10,7 @@ import {
   totals,
 } from "../../src/calculations";
 import type { AssetRecord, ExchangeRate, Metadata } from "../../src/types";
+import { compareSnapshots, type ReportSnapshot } from "../../src/reportComparison";
 
 function rate(numerator: string, denominator: string, value: number): ExchangeRate {
   return {
@@ -116,6 +117,53 @@ describe("report distributions and summaries", () => {
     expect(chartCurrency(metadata)).toBe("USD");
     expect(chartCurrency({ ...metadata, settings: null })).toBe("CNY");
     expect(chartCurrency({ ...metadata, currencies: [] })).toBe("");
+  });
+});
+describe("cross-report growth", () => {
+  function snapshot(records: AssetRecord[], rates: ExchangeRate[]): ReportSnapshot {
+    return {
+      report: {
+        report_id: "r",
+        user_id: "u",
+        title: "",
+        report_time: "",
+        create_time: "",
+        update_time: "",
+        exchange_rates: rates,
+      },
+      records,
+    };
+  }
+  const previous = snapshot(
+    [record("USD", 100, 0.5), { ...record("JPY", 90), institution_id: "closed" }],
+    [rate("USD", "CNY", 6)],
+  );
+  const current = snapshot(
+    [record("USD", 100, 0.5), { ...record("CNY", 30), institution_id: "new" }],
+    [rate("USD", "CNY", 8)],
+  );
+
+  it("uses each snapshot's rates and marks only incomplete changes unavailable", () => {
+    expect(compareSnapshots(current, previous, "institution_id", "CNY")).toEqual({
+      currencies: ["CNY"],
+      rows: [
+        { id: "bank", changes: [100] },
+        { id: "closed", changes: [null] },
+        { id: "new", changes: [30] },
+      ],
+    });
+  });
+
+  it("includes currencies present in only one snapshot and measures currency rows in their own units", () => {
+    expect(compareSnapshots(current, previous, "currency_id", "").rows).toEqual([
+      { id: "USD", changes: [0] },
+      { id: "JPY", changes: [-90] },
+      { id: "CNY", changes: [30] },
+    ]);
+    expect(compareSnapshots(current, previous, "asset_type_id", "")).toEqual({
+      currencies: ["USD", "JPY", "CNY"],
+      rows: [{ id: "deposit", changes: [0, -90, 30] }],
+    });
   });
 });
 describe("custom fields", () => {

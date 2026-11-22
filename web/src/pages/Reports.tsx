@@ -462,6 +462,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
               getInput={() => ({
                 report: { ...state.data!.report, title, exchange_rates: rates },
                 records: visible,
+                filters,
                 metadata,
                 currency,
                 decimals,
