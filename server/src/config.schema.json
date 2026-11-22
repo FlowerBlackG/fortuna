@@ -4,6 +4,11 @@
   "type": "object",
   "required": ["database", "web"],
   "properties": {
+    "environment": {
+      "type": "string",
+      "enum": ["development", "staging", "production"],
+      "default": "production"
+    },
     "database": {
       "type": "object",
       "required": ["db_file"],

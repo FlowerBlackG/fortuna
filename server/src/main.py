@@ -14,6 +14,7 @@ def main() -> None:
     from app import create_app
     from config import Config
     from logging_config import configure_logging
+    from waitress import serve
 
     parser = argparse.ArgumentParser(description="Fortuna personal asset settlement server")
     parser.add_argument("-c", "--config", type=Path, required=True, help="Path to config.json")
@@ -27,7 +28,11 @@ def main() -> None:
     except (OSError, ValueError, KeyError, TypeError) as error:
         parser.error(f"Invalid configuration: {error}")
     print(f"Fortuna {VERSION_TAG} · Python {platform.python_version()} · Config: {args.config.resolve()}", flush=True)
-    create_app(config, args.web_dir).run(host=args.host, port=args.port)
+    app = create_app(config, args.web_dir)
+    if app.debug:
+        app.run(host=args.host, port=args.port, debug=True, use_reloader=True)
+    else:
+        serve(app, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

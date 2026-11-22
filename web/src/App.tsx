@@ -24,7 +24,7 @@ import { AuthPage, ServerPage } from "./pages/Access";
 import { SettingsPage } from "./pages/Settings";
 import { ReportsPage, ReportPage } from "./pages/Reports";
 import { AboutPage } from "./pages/About";
-import type { BuildInfo } from "./version";
+import type { ServerInfo } from "./version";
 import "./App.css";
 
 const AnalysisPage = lazy(() =>
@@ -106,7 +106,7 @@ function WorkspaceMenu() {
   );
 }
 
-function Workspace({ serverVersion }: { serverVersion: BuildInfo }) {
+function Workspace({ serverVersion }: { serverVersion: ServerInfo }) {
   const { error, refresh } = useMetadata();
   return (
     <Layout direction="horizontal" className="app-layout">
@@ -156,7 +156,7 @@ function Application() {
   const location = useLocation();
   const [identity, setIdentity] = useState(authToken());
   const [address, setAddress] = useState(serverAddress() || window.location.origin);
-  const [connection, setConnection] = useState<{ address: string; version: BuildInfo | null }>();
+  const [connection, setConnection] = useState<{ address: string; version: ServerInfo | null }>();
   useEffect(() => {
     const session = () => {
       setIdentity(authToken());

@@ -24,6 +24,8 @@ vp run dev-all-hosts
 
 Open the displayed frontend URL and connect to `http://127.0.0.1:5000`. Create an account, configure currencies/institutions/asset types, then create a report. The database path is relative to the config file.
 
+Set `environment` in the server config to `development` (the local template) or `staging` to enable Flask debugging and automatically restart when Python code changes. Use `production` to serve the app with Waitress on the configured host and port, with debugging and live reload disabled. Configs that omit `environment` default to `production`. The About page shows the connected server’s environment.
+
 ## Build and check
 
 `make build` builds `web/dist`; `make test` runs API/config tests, calculation tests, and frontend lint/type checks. With both local servers running, `cd web && vp run test:browser` exercises Chrome; `vp run test:regression` checks caching and chart values against Vite (`CHROME_PATH` overrides the Chrome executable).

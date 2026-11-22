@@ -27,6 +27,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_schema_decodes_nested_values_defaults_and_paths(self):
         config = self.load()
+        self.assertEqual(config.environment, "production")
         self.assertEqual(config.database.db_file, self.path.parent / "nested/test.db")
         self.assertEqual(config.web.user.session.fortuna_token_expire_time_seconds, 60)
         self.assertIsNone(config.logging)
@@ -36,6 +37,10 @@ class ConfigTests(unittest.TestCase):
         self.assertIsNone(self.load().logging)
 
     def test_schema_rejects_invalid_config_with_field_location(self):
+        self.data["environment"] = "debug"
+        with self.assertRaisesRegex(ValueError, "environment"):
+            self.load()
+        del self.data["environment"]
         for value in (0, -1, True, "60"):
             self.data["web"]["user"]["session"]["fortuna_token_expire_time_seconds"] = value
             with self.assertRaisesRegex(ValueError, "web.user.session.fortuna_token_expire_time_seconds"):

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { t } from "../i18n";
 import { WalletIcon } from "tdesign-icons-react";
-import { Card, Descriptions } from "tdesign-react";
-import Version, { type BuildInfo } from "../version";
+import { Card, Descriptions, Tag } from "tdesign-react";
+import Version, { type BuildInfo, type ServerInfo } from "../version";
 
 function buildTime(value?: string) {
   const match = value?.match(
@@ -19,7 +19,7 @@ function buildTime(value?: string) {
   return `${date} ${time} ${zone}`;
 }
 
-export function AboutPage({ server }: { server: BuildInfo }) {
+export function AboutPage({ server }: { server: ServerInfo }) {
   const builds: ["Server" | "Web", BuildInfo][] = [
     ["Server", server],
     ["Web", Version],
@@ -34,13 +34,25 @@ export function AboutPage({ server }: { server: BuildInfo }) {
         column={1}
         tableLayout="auto"
         colon={false}
-        items={builds.flatMap(([name, build]) => [
+        items={[
           {
-            label: t(`${name} version`),
-            content: build.code == null ? build.tag : `${build.tag} (${build.code})`,
+            label: t("Server environment"),
+            content: server.environment ? (
+              <Tag shape="round" theme="primary" variant="light">
+                {t(server.environment)}
+              </Tag>
+            ) : (
+              t("Unavailable")
+            ),
           },
-          { label: t(`${name} build`), content: buildTime(build.buildTime) },
-        ])}
+          ...builds.flatMap(([name, build]) => [
+            {
+              label: t(`${name} version`),
+              content: build.code == null ? build.tag : `${build.tag} (${build.code})`,
+            },
+            { label: t(`${name} build`), content: buildTime(build.buildTime) },
+          ]),
+        ]}
       />
     </Card>
   );

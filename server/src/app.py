@@ -161,6 +161,7 @@ def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
         raise RuntimeError("Fortuna requires Python 3.14+ with builtin uuid.uuid7")
     initialize(config.database.db_file)
     app = Flask(__name__, static_folder=None)
+    app.debug = config.environment in {"development", "staging"}
     cast(DefaultJSONProvider, app.json).ensure_ascii = False
     tokens = TokenStore(config.web.user.session.fortuna_token_expire_time_seconds)
     events = deletion_events()
@@ -230,7 +231,7 @@ def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
 
     @app.get("/api/ping")
     def ping() -> ApiResponse:
-        return IResponse.ok({"app": "Fortuna", "version": VERSION_TAG,
+        return IResponse.ok({"app": "Fortuna", "environment": config.environment, "version": VERSION_TAG,
                              "version_code": VERSION_CODE, "build_time": BUILD_TIME})
 
     @app.post("/api/account")

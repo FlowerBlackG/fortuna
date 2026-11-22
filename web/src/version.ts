@@ -6,6 +6,10 @@ export interface BuildInfo {
   buildTime?: string;
 }
 
+export interface ServerInfo extends BuildInfo {
+  environment?: "development" | "staging" | "production";
+}
+
 export default class Version {
   static code = 1;
   static tag = "0.0.1-dev";

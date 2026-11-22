@@ -72,6 +72,15 @@ class ApiTests(unittest.TestCase):
         session.tokens[self.token] = Session(self.account["account"]["user_id"], datetime.now(timezone.utc) - timedelta(seconds=1))
         self.call("GET", "/account", code=401)
 
+    def test_ping_reports_environment_and_debug_matches_mode(self):
+        for environment in ("development", "staging", "production"):
+            with self.subTest(environment=environment):
+                self.config.environment = environment
+                app = create_app(self.config)
+                self.assertEqual(app.debug, environment != "production")
+                response = app.test_client().get("/api/ping")
+                self.assertEqual(response.json["data"]["environment"], environment)
+
     def test_cross_account_access_and_foreign_references(self):
         currency, institution, asset_type, report, record = self.fixture()
         other = self.call("POST", "/account", {"username": "bob", "password": "secret"})

@@ -155,6 +155,9 @@ try {
   await nav.getByRole("link", { name: "About", exact: true }).click();
   await page.getByRole("heading", { name: "Fortuna", exact: true }).waitFor();
   const build = await api("GET", "/ping");
+  await expect(page.getByRole("row").filter({ hasText: "Server environment" })).toContainText(
+    build.environment,
+  );
   await expect(
     page.getByText(`${build.version} (${build.version_code})`, { exact: true }),
   ).toBeVisible();

@@ -2,7 +2,7 @@
 import { t, serverMessage } from "./i18n";
 import axios from "axios";
 import type { IResponse } from "./response";
-import type { BuildInfo } from "./version";
+import type { ServerInfo } from "./version";
 
 const SERVER_KEY = "fortuna.server";
 const TOKEN_KEY = "fortuna.token";
@@ -38,15 +38,21 @@ export function normalizeServer(value: string) {
   url.search = "";
   return url.toString().replace(/\/+$/, "");
 }
-export async function ping(address: string): Promise<BuildInfo> {
+export async function ping(address: string): Promise<ServerInfo> {
   const response = await axios.get<
-    IResponse<{ app: string; version: string; version_code?: number; build_time?: string }>
+    IResponse<{
+      app: string;
+      version: string;
+      version_code?: number;
+      build_time?: string;
+      environment?: ServerInfo["environment"];
+    }>
   >(`${normalizeServer(address)}/api/ping`, { timeout: 6000 });
   if (response.data?.code !== 200 || response.data.data?.app !== "Fortuna") {
     throw new Error(t("This address did not respond as a Fortuna server"));
   }
-  const { version, version_code, build_time } = response.data.data;
-  return { tag: version, code: version_code, buildTime: build_time };
+  const { version, version_code, build_time, environment } = response.data.data;
+  return { tag: version, code: version_code, buildTime: build_time, environment };
 }
 export class ApiError extends Error {
   code: number;
