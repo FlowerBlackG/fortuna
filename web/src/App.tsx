@@ -131,8 +131,11 @@ function Workspace({ serverVersion }: { serverVersion: ServerInfo }) {
             />
           )}
           <Routes>
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/reports/:reportId" element={<ReportPage />} />
+            <Route path="/reports" element={<ReportsPage serverVersion={serverVersion} />} />
+            <Route
+              path="/reports/:reportId"
+              element={<ReportPage serverVersion={serverVersion} />}
+            />
             <Route
               path="/analysis"
               element={

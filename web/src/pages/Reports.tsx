@@ -36,6 +36,7 @@ import { emptyFilters, filterRecords, useDefaultCurrency, usePrecision } from ".
 import type { RecordDraft, RecordStatus } from "../components/Records";
 import { useTableSort } from "../tableState";
 import type { ReportExport } from "../reportExport";
+import type { ServerInfo } from "../version";
 import { ReportExportDialog } from "../components/ReportExportDialog";
 
 const ReportDistribution = lazy(() =>
@@ -82,7 +83,7 @@ function ExportButton({
   );
 }
 
-export function ReportsPage() {
+export function ReportsPage({ serverVersion }: { serverVersion: ServerInfo }) {
   const navigate = useNavigate();
   const { metadata, refresh } = useMetadata();
   const state = useLoad(async () => {
@@ -151,6 +152,7 @@ export function ReportsPage() {
               ]);
               return {
                 report,
+                serverVersion,
                 records,
                 metadata,
                 currency: defaultCurrency?.currency_id ?? "",
@@ -242,12 +244,18 @@ export function ReportsPage() {
   );
 }
 
-export function ReportPage() {
+export function ReportPage({ serverVersion }: { serverVersion: ServerInfo }) {
   const { reportId = "" } = useParams();
-  return <ReportDetail key={reportId} reportId={reportId} />;
+  return <ReportDetail key={reportId} reportId={reportId} serverVersion={serverVersion} />;
 }
 
-function ReportDetail({ reportId }: { reportId: string }) {
+function ReportDetail({
+  reportId,
+  serverVersion,
+}: {
+  reportId: string;
+  serverVersion: ServerInfo;
+}) {
   const { metadata, refresh: refreshMetadata, ensure } = useMetadata();
   const [records, setRecords] = useState<AssetRecord[]>([]);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
@@ -461,6 +469,7 @@ function ReportDetail({ reportId }: { reportId: string }) {
               disabled={unsynced || state.loading}
               getInput={() => ({
                 report: { ...state.data!.report, title, exchange_rates: rates },
+                serverVersion,
                 records: visible,
                 filters,
                 metadata,

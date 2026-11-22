@@ -173,6 +173,12 @@ try {
   await expect(
     page.getByText(`${build.version} (${build.version_code})`, { exact: true }),
   ).toBeVisible();
+  const appBuild = await page
+    .getByRole("row")
+    .filter({ hasText: "Web version" })
+    .getByRole("cell")
+    .last()
+    .innerText();
   await expect(page.getByRole("row").filter({ hasText: "Server build" })).toContainText(
     /\d{4}-\d{2}-\d{2} \d{2}:\d{2} (CST|[+-]\d{1,2}(:\d{2})?)/,
   );
@@ -505,6 +511,10 @@ try {
   for (const sheet of book.worksheets) {
     assert.equal(sheet.getCell("A1").font.name, "Latin Text");
     assert.equal(sheet.getCell("A2").font.name, "CJK Text");
+    assert.equal(
+      sheet.getCell("A3").text,
+      `由 Fortuna 生成。Fortuna 服务端 ${build.version} (${build.version_code})，Fortuna 应用 ${appBuild}`,
+    );
     const rows = sheet.getRows(1, sheet.rowCount);
     const groups = {
       按机构: [[institution, 156, 60, 12]],
@@ -605,6 +615,12 @@ try {
     ["By asset type", "Growth by asset type"],
   );
   assert.equal(englishBook.worksheets[0].getCell("A2").text, "Report time");
+  for (const sheet of englishBook.worksheets) {
+    assert.equal(
+      sheet.getCell("A3").text,
+      `By Fortuna. Fortuna Server ${build.version} (${build.version_code}), Fortuna App ${appBuild}`,
+    );
+  }
   assert.deepEqual(overviewRows(englishBook.worksheets[0], "Overview"), [
     ["Asset type", "CNY", "USD美元"],
     ["Total", 60, 12],
@@ -612,14 +628,14 @@ try {
     ["Deposit", 60, 0],
   ]);
   const growth = englishBook.worksheets[1];
-  assert.match(growth.getCell("A4").text, /Change since Snapshot 1/);
-  const growthColumns = growth.getRow(5);
+  assert.match(growth.getCell("A5").text, /Change since Snapshot 1/);
+  const growthColumns = growth.getRow(6);
   const headers = ["", ...[1, 2, 3].map((i) => growthColumns.getCell(i).text)];
   const usdChange = headers.indexOf("Change (USD美元)");
   const cnyChange = headers.indexOf("Change (CNY)");
   assert.ok(usdChange > 0 && cnyChange > 0);
   assert.deepEqual(
-    [6, 7].map((row) => [
+    [7, 8].map((row) => [
       growth.getRow(row).getCell(1).text,
       growth.getRow(row).getCell(usdChange).value,
       growth.getRow(row).getCell(cnyChange).value,

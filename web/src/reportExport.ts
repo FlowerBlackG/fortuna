@@ -19,6 +19,7 @@ import {
   type GroupBy,
 } from "./calculations";
 import type { Metadata } from "./types";
+import Version, { type BuildInfo } from "./version";
 
 interface Section {
   title: string;
@@ -35,7 +36,14 @@ interface ReportView {
   sections: Section[];
 }
 
+interface ReportHeader {
+  title: string;
+  date: string;
+  attribution: string;
+}
+
 export interface ReportExport extends ReportSnapshot {
+  serverVersion: BuildInfo;
   filters?: RecordFilters;
   metadata: Metadata;
   currency: string;
@@ -231,8 +239,7 @@ function reportSections({
 }
 
 async function workbook(
-  title: string,
-  date: string,
+  { title, date, attribution }: ReportHeader,
   views: ReportView[],
   decimals: number,
   language: Language,
@@ -272,15 +279,16 @@ async function workbook(
       });
       return row;
     }
-    function heading(text: string, size: number) {
-      const row = add([text], size, true);
+    function fullWidthRow(text: string, size: number, bold = true) {
+      const row = add([text], size, bold);
       sheet.mergeCells(row.number, 1, row.number, width);
     }
-    heading(title, 18);
+    fullWidthRow(title, 18);
     add([translate(language, "Report time"), date], 11, false, [1]);
+    fullWidthRow(attribution, 10, false);
     for (const section of view.sections) {
       sheet.addRow([]);
-      heading(section.title, 13);
+      fullWidthRow(section.title, 13);
       if (!section.rows.length) {
         add([translate(language, "None")]);
         continue;
@@ -358,8 +366,7 @@ function layoutPdfTable(
 }
 
 async function pdfDocument(
-  title: string,
-  date: string,
+  { title, date, attribution }: ReportHeader,
   views: ReportView[],
   decimals: number,
   language: Language,
@@ -374,7 +381,7 @@ async function pdfDocument(
   doc.setProperties({ title, creator: "Fortuna" });
   let font = "helvetica";
   // The PDF's built-in Latin fonts can't render CJK names or record content.
-  if (/[\u0100-\u200f\u2028-\u{10ffff}]/u.test(JSON.stringify([title, date, views]))) {
+  if (/[\u0100-\u200f\u2028-\u{10ffff}]/u.test(JSON.stringify([title, date, attribution, views]))) {
     const response = await fetch(fontUrl);
     if (!response.ok) throw new Error(t("Could not load the PDF font"));
     const bytes = new Uint8Array(await response.arrayBuffer());
@@ -438,6 +445,7 @@ async function pdfDocument(
       body: [
         [{ content: lines, styles: { fontSize: 19, fontStyle: bold } }],
         [`${view.name}   ·   ${translate(language, "Report time")}  ${date}`],
+        [attribution],
       ],
     });
     for (const table of view.tables) {
@@ -501,14 +509,28 @@ async function pdfDocument(
   return new Uint8Array(doc.output("arraybuffer"));
 }
 
+function versionLabel({ tag, code }: BuildInfo, addPrefixV = true) {
+  const version = addPrefixV ? (tag.startsWith("v") ? tag : `v${tag}`) : tag;
+  return code == null ? version : `${version} (${code})`;
+}
+
 export async function downloadReport(input: ConfiguredReport) {
   const { language, decimals } = input;
   const title = reportTitle(input.report, language);
-  const date = new Date(input.report.report_time).toLocaleString(language);
+  const header = {
+    title,
+    date: new Date(input.report.report_time).toLocaleString(language),
+    attribution: translate(
+      language,
+      "By Fortuna. Fortuna Server {0}, Fortuna App {1}",
+      versionLabel(input.serverVersion, false),
+      versionLabel(Version, false),
+    ),
+  };
   const sections = reportSections(input);
   const [xlsx, pdf] = await Promise.all([
-    workbook(title, date, sections, decimals, language),
-    pdfDocument(title, date, sections, decimals, language),
+    workbook(header, sections, decimals, language),
+    pdfDocument(header, sections, decimals, language),
   ]);
   const base =
     title

@@ -27,6 +27,8 @@ export const zhCN = {
   "Confirm password": "确认密码",
   Report: "报告",
   "Report time": "报告时间",
+  "By Fortuna. Fortuna Server {0}, Fortuna App {1}":
+    "由 Fortuna 生成。Fortuna 服务端 {0}，Fortuna 应用 {1}",
   Created: "创建时间",
   Updated: "更新时间",
   Actions: "操作",
