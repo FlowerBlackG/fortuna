@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { expect, it } from "vite-plus/test";
-import { formatReportField, mergeReportFields, reportFields } from "./reportFields";
-import type { AssetRecord, AssetType, CustomField } from "./types";
+import { formatReportField, mergeReportFields, reportFields } from "../../src/reportFields";
+import type { AssetRecord, AssetType, CustomField } from "../../src/types";
 
 it("merges selected fields by exact name and affixes while preserving each record's field index", () => {
   const ratio: CustomField = {

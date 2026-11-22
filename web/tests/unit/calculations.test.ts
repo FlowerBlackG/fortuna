@@ -8,8 +8,8 @@ import {
   customValue,
   distribution,
   totals,
-} from "./calculations";
-import type { AssetRecord, ExchangeRate, Metadata } from "./types";
+} from "../../src/calculations";
+import type { AssetRecord, ExchangeRate, Metadata } from "../../src/types";
 
 function rate(numerator: string, denominator: string, value: number): ExchangeRate {
   return {

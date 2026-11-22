@@ -9,8 +9,8 @@
     "build": "tsc -b && vp build",
     "lint": "vp lint",
     "test": "vp test run",
-    "test:browser": "node e2e/smoke.mjs",
-    "test:regression": "node e2e/regression.mjs",
+    "test:browser": "node tests/e2e/smoke.mjs",
+    "test:regression": "node tests/e2e/regression.mjs",
     "preview": "vp preview"
   },
   "dependencies": {

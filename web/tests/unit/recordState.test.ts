@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { describe, expect, it } from "vite-plus/test";
-import { emptyFilters, filterRecords } from "./recordState";
-import type { AssetRecord, Metadata } from "./types";
+import { emptyFilters, filterRecords } from "../../src/recordState";
+import type { AssetRecord, Metadata } from "../../src/types";
 
 const metadata: Metadata = {
   currencies: [],
