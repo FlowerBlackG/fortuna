@@ -7,13 +7,13 @@ from dataclasses import MISSING, asdict, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
-from typing import Any, TypeGuard, cast
+from typing import Any, Literal, TypeGuard, cast
 
 from flask import Flask, Response, g, request, send_from_directory
 from flask.json.provider import DefaultJSONProvider
 from werkzeug.exceptions import HTTPException
 
-from auth import PASSWORD_HASHER, TokenStore, password_matches
+from auth import BUILTIN_NAME, PASSWORD_HASHER, TokenStore, create_account, password_matches
 from config import Config
 from database import connect, initialize
 from entities import (AssetType, Currency, CurrencyExchangeRate, Entity, Institution, Report,
@@ -156,10 +156,21 @@ def entity_data(entity: type[Resource], data: JsonObject) -> JsonObject:
     return result
 
 
-def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
+def create_app(config: Config, web_dir: str | Path | None = None, *,
+               runtime_mode: Literal["server", "embedded"] = "server", secret: str = "",
+               selected_file: bool = False, create_file: bool = False) -> Flask:
     if not hasattr(uuid, "uuid7"):
         raise RuntimeError("Fortuna requires Python 3.14+ with builtin uuid.uuid7")
-    initialize(config.database.db_file)
+    embedded = None
+    if runtime_mode == "embedded":
+        from embedded.runtime import EmbeddedRuntime
+        if web_dir:
+            raise ValueError("Invalid embedded runtime configuration")
+        embedded = EmbeddedRuntime(config, secret, selected_file=selected_file, create_file=create_file)
+    elif runtime_mode != "server" or secret or selected_file or create_file:
+        raise ValueError("Invalid server runtime configuration")
+    else:
+        initialize(config.database.db_file)
     app = Flask(__name__, static_folder=None)
     app.debug = config.environment in {"development", "staging"}
     cast(DefaultJSONProvider, app.json).ensure_ascii = False
@@ -171,12 +182,17 @@ def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
     @app.before_request
     def prepare() -> ApiResponse | None:
         g.request_start = perf_counter()
-        if request.method == "OPTIONS":
+        if not embedded and request.method == "OPTIONS":
             return IResponse.ok()
         if not request.path.startswith("/api/"):
             return None
-        g.db = connect(config.database.db_file)
-        if (request.method, request.path) not in public:
+        if embedded:
+            embedded.verify_transport()
+        g.db = connect(config.database.db_file, existing_only=selected_file)
+        local_user = embedded.request_user(g.db) if embedded else None
+        if local_user is not None:
+            g.user_id = local_user
+        elif (request.method, request.path) not in public:
             session = tokens.resolve(request.headers.get("Fortuna-Auth", ""))
             if session is None:
                 raise ApiError(401, "Please log in")
@@ -195,9 +211,10 @@ def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
                 g.db.commit()
             else:
                 g.db.rollback()
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Fortuna-Auth"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, PUT, DELETE, OPTIONS"
+        if not embedded:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Fortuna-Auth"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, PUT, DELETE, OPTIONS"
         if request.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
             code = body.get("code", response.status_code) if isinstance(body, dict) else response.status_code
@@ -239,12 +256,9 @@ def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
         data = payload()
         username = text(data, "username", True).strip()
         password = text(data, "password", True)
-        if repo(UserAccount).get(username=username):
+        if username == BUILTIN_NAME or repo(UserAccount).get(username=username):
             raise ApiError(409, "Username is already taken")
-        timestamp = now()
-        user = UserAccount(str(uuid.uuid7()), username, timestamp, timestamp, PASSWORD_HASHER.hash(password))
-        repo(UserAccount).insert(user)
-        repo(UserSettings).insert(UserSettings(user.user_id))
+        user = create_account(g.db, username, password)
         return IResponse.ok({"account": serialize(user), "token": tokens.create(user.user_id)})
 
     @app.post("/api/login")
@@ -279,7 +293,10 @@ def create_app(config: Config, web_dir: str | Path | None = None) -> Flask:
             tokens.revoke_user(g.user_id)
             return IResponse.ok()
         if "username" in data:
-            user.username = text(data, "username", True).strip()
+            username = text(data, "username", True).strip()
+            if username == BUILTIN_NAME and username != user.username:
+                raise ApiError(409, "Username is already taken")
+            user.username = username
         if "new_password" in data:
             user.user_password = PASSWORD_HASHER.hash(text(data, "new_password", True))
         repo(UserAccount).update(user)

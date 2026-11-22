@@ -2,6 +2,8 @@
 
 Personal asset settlement with Flask, SQLite, and React/TDesign.
 
+Fortuna Desktop opens the built-in workspace automatically. Choose **Server → Database file** to open or create a local SQLite database with its own accounts, or **Server → Remote server** to connect to an existing deployment. Run `make desktop-install` once and `make desktop` to launch a development build. [Desktop setup and storage guide](electron/README.md)
+
 ## Run locally
 
 Requires **Python 3.14+** and Vite+ (`vp`). From the repository root:

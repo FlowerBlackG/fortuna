@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MulanPSL-2.0
 import secrets
+import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -8,10 +9,21 @@ from threading import Lock
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerificationError, InvalidHashError
 
+from entities import Repository, UserAccount, UserSettings
+
+BUILTIN_NAME = "__fortuna_builtin__"
 PASSWORD_HASHER = PasswordHasher(
     time_cost=3, memory_cost=65536, parallelism=4, hash_len=32,
     salt_len=16, encoding="utf-8", type=Type.ID,
 )
+
+
+def create_account(db: sqlite3.Connection, username: str, password: str) -> UserAccount:
+    timestamp = datetime.now(timezone.utc).isoformat()
+    account = UserAccount(str(uuid.uuid7()), username, timestamp, timestamp, PASSWORD_HASHER.hash(password))
+    Repository(db, UserAccount).insert(account)
+    Repository(db, UserSettings).insert(UserSettings(account.user_id))
+    return account
 
 
 def password_matches(encoded: str, password: str) -> bool:

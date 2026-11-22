@@ -17,8 +17,16 @@ import {
   Textarea,
 } from "tdesign-react";
 import type { PrimaryTableCol } from "tdesign-react";
-import { DeleteIcon, EditIcon, RefreshIcon } from "tdesign-icons-react";
+import {
+  DeleteIcon,
+  DownloadIcon,
+  EditIcon,
+  FolderOpenIcon,
+  RefreshIcon,
+} from "tdesign-icons-react";
 import { request, setToken } from "../api";
+import { desktop, isBuiltin, isLocal, runtime, switchMode } from "../desktop";
+import { DatabaseFiles } from "../components/DatabaseFiles";
 import { action, selectString, settingsObject, showError } from "../helpers";
 import { useLoad } from "../useLoad";
 import { useMetadata } from "../metadata";
@@ -644,6 +652,77 @@ function AccountSettings() {
   );
 }
 
+function LocalDatabase() {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function operate(exporting: boolean) {
+    if (!desktop) return;
+    setStatus("");
+    setBusy(true);
+    try {
+      if (exporting) {
+        if (await desktop.backup()) setStatus(t("Backup saved"));
+      } else await desktop.reveal();
+    } catch (reason) {
+      setStatus(`${t("Operation failed")}: ${String(reason)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card title={t("Local database")} className="settings-section">
+      <div className="stack">
+        <section className="database-current">
+          <div>
+            <strong>{isBuiltin() ? "fortuna.sqlite3" : runtime?.databaseName}</strong>
+            <p className="muted">
+              {isBuiltin() ? t("Built-in workspace") : t("Database accounts")}
+            </p>
+          </div>
+          {isBuiltin() ? (
+            <Space breakLine>
+              <Button
+                shape="round"
+                theme="default"
+                icon={<FolderOpenIcon />}
+                disabled={busy}
+                onClick={() => void operate(false)}
+              >
+                {t("Show database location")}
+              </Button>
+              <Button
+                shape="round"
+                theme="default"
+                variant="outline"
+                icon={<DownloadIcon />}
+                disabled={busy}
+                onClick={() => void operate(true)}
+              >
+                {t("Export database backup…")}
+              </Button>
+            </Space>
+          ) : (
+            <Button
+              shape="round"
+              theme="default"
+              variant="outline"
+              onClick={() => action(() => switchMode("builtin"))}
+            >
+              {t("Use built-in database")}
+            </Button>
+          )}
+        </section>
+        {status && (
+          <p className="muted" role="status">
+            {status}
+          </p>
+        )}
+        <DatabaseFiles showName={false} />
+      </div>
+    </Card>
+  );
+}
+
 export function SettingsPage() {
   const { refresh } = useMetadata();
   const [tab, setTab] = useState("currencies");
@@ -673,9 +752,16 @@ export function SettingsPage() {
             </>
           )}
         </Tabs.TabPanel>
-        <Tabs.TabPanel value="account" label={t("Account")}>
-          {tab === "account" && <AccountSettings />}
-        </Tabs.TabPanel>
+        {!isBuiltin() && (
+          <Tabs.TabPanel value="account" label={t("Account")}>
+            {tab === "account" && <AccountSettings />}
+          </Tabs.TabPanel>
+        )}
+        {isLocal() && (
+          <Tabs.TabPanel value="database" label={t("Local database")}>
+            {tab === "database" && <LocalDatabase />}
+          </Tabs.TabPanel>
+        )}
       </Tabs>
     </>
   );

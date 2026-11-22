@@ -33,10 +33,14 @@ class Config(SimpleNamespace):
     @classmethod
     def load(cls, filename: str | Path) -> Self:
         path = Path(filename).resolve()
-        schema = json.loads(Path(__file__).with_name("config.schema.json").read_text(encoding="utf-8"))
         data = json.loads(path.read_text(encoding="utf-8"))
+        return cls.from_data(data, path.parent)
+
+    @classmethod
+    def from_data(cls, data: dict, directory: Path) -> Self:
+        schema = json.loads(Path(__file__).with_name("config.schema.json").read_text(encoding="utf-8"))
         error = next(iter(Draft202012Validator(schema).iter_errors(data)), None)
         if error:
             location = ".".join(map(str, error.absolute_path)) or "config"
             raise ValueError(f"{location}: {error.message}")
-        return cls(**vars(decode(data, schema, path.parent)))
+        return cls(**vars(decode(data, schema, directory)))

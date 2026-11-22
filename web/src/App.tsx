@@ -16,7 +16,25 @@ import {
   SettingIcon,
   WalletIcon,
 } from "tdesign-icons-react";
-import { authToken, ping, request, serverAddress, sessionEvents, setServer, setToken } from "./api";
+import {
+  authToken,
+  initialAddress,
+  ping,
+  request,
+  serverAddress,
+  sessionEvents,
+  setServer,
+  setToken,
+} from "./api";
+import {
+  desktop,
+  desktopBuild,
+  initializeRuntime,
+  isBuiltin,
+  runtime,
+  switchMode,
+} from "./desktop";
+import { DatabaseFiles } from "./components/DatabaseFiles";
 import { MetadataProvider } from "./data";
 import { useMetadata } from "./metadata";
 import { action } from "./helpers";
@@ -73,19 +91,21 @@ function WorkspaceMenu() {
               title={t("Server")}
               onClick={() => navigate("/server")}
             />
-            <Button
-              shape="round"
-              variant="text"
-              icon={<LogoutIcon />}
-              aria-label={t("Log out")}
-              title={t("Log out")}
-              onClick={() =>
-                action(async () => {
-                  await request("POST", "/logout");
-                  setToken("");
-                })
-              }
-            />
+            {!isBuiltin() && (
+              <Button
+                shape="round"
+                variant="text"
+                icon={<LogoutIcon />}
+                aria-label={t("Log out")}
+                title={t("Log out")}
+                onClick={() =>
+                  action(async () => {
+                    await request("POST", "/logout");
+                    setToken("");
+                  })
+                }
+              />
+            )}
           </Space>
         }
       >
@@ -158,12 +178,12 @@ function Application() {
   const navigate = useNavigate();
   const location = useLocation();
   const [identity, setIdentity] = useState(authToken());
-  const [address, setAddress] = useState(serverAddress() || window.location.origin);
+  const [address, setAddress] = useState(initialAddress);
   const [connection, setConnection] = useState<{ address: string; version: ServerInfo | null }>();
   useEffect(() => {
     const session = () => {
       setIdentity(authToken());
-      setAddress(serverAddress() || window.location.origin);
+      setAddress(initialAddress());
     };
     const configure = () => navigate("/server");
     sessionEvents.addEventListener("session", session);
@@ -181,7 +201,7 @@ function Application() {
     void ping(address)
       .then((version) => {
         if (!active) return;
-        if (!serverAddress()) setServer(address);
+        if (!desktopBuild && !serverAddress()) void setServer(address);
         setConnection({ address, version });
       })
       .catch(() => {
@@ -194,14 +214,79 @@ function Application() {
   if (location.pathname === "/server") return <ServerPage onConnected={setConnection} />;
   if (connection?.address !== address)
     return <Loading fullscreen text={t("Connecting to Fortuna…")} />;
-  if (!serverAddress() || connection.version === null) return <Navigate to="/server" replace />;
-  if (!identity)
+  if ((!isBuiltin() && !serverAddress()) || connection.version === null)
+    return <Navigate to="/server" replace />;
+  if (!isBuiltin() && !identity)
     return location.pathname === "/login" ? <AuthPage /> : <Navigate to="/login" replace />;
   return (
     <MetadataProvider key={`${serverAddress()}:${identity}`}>
       <Workspace serverVersion={connection.version} />
     </MetadataProvider>
   );
+}
+
+function DesktopStartup() {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState(() => (desktop ? "" : t("Desktop connection unavailable")));
+  useEffect(() => {
+    if (!desktop) return;
+    let active = true;
+    const remove = desktop.onUnavailable(setError);
+    void desktop
+      .runtime()
+      .then((info) => {
+        if (!active) return;
+        initializeRuntime(info);
+        if (info.error) setError(info.error);
+        else setReady(true);
+      })
+      .catch((reason) => {
+        if (active) setError(String(reason));
+      });
+    return () => {
+      active = false;
+      remove();
+    };
+  }, []);
+  if (error)
+    return (
+      <main className="access-page">
+        <Space direction="vertical">
+          <Alert theme="error" message={t("Could not open the workspace")} />
+          <details>
+            <summary>{t("Diagnostics")}</summary>
+            <pre>{error}</pre>
+          </details>
+          <Space>
+            <Button
+              shape="round"
+              theme="default"
+              onClick={() => action(() => switchMode(runtime?.mode ?? "builtin"))}
+            >
+              {t("Retry")}
+            </Button>
+            {runtime?.mode === "file" && (
+              <Button
+                shape="round"
+                theme="default"
+                onClick={() => action(() => switchMode("builtin"))}
+              >
+                {t("Built-in")}
+              </Button>
+            )}
+            <Button
+              shape="round"
+              theme="default"
+              onClick={() => action(() => switchMode("remote"))}
+            >
+              {t("Remote server")}
+            </Button>
+          </Space>
+          <DatabaseFiles />
+        </Space>
+      </main>
+    );
+  return ready ? <Application /> : <Loading fullscreen text={t("Opening workspace…")} />;
 }
 
 export default function App() {
@@ -211,9 +296,7 @@ export default function App() {
   }, [language]);
   return (
     <ConfigProvider globalConfig={language === "zh-CN" ? zhCN : enUS}>
-      <HashRouter>
-        <Application />
-      </HashRouter>
+      <HashRouter>{desktopBuild ? <DesktopStartup /> : <Application />}</HashRouter>
     </ConfigProvider>
   );
 }

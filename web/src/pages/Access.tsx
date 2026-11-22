@@ -4,7 +4,17 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Alert, Button, Card, Form, Input, Radio, Space } from "tdesign-react";
 import { ServerIcon, WalletIcon } from "tdesign-icons-react";
-import { authToken, ping, request, serverAddress, setServer, setToken } from "../api";
+import {
+  authToken,
+  initialAddress,
+  ping,
+  request,
+  serverAddress,
+  setServer,
+  setToken,
+} from "../api";
+import { desktop, isBuiltin, runtime, switchMode } from "../desktop";
+import { DatabaseFiles } from "../components/DatabaseFiles";
 import type { Account } from "../types";
 import type { ServerInfo } from "../version";
 
@@ -14,7 +24,8 @@ export function ServerPage({
   onConnected: (server: { address: string; version: ServerInfo }) => void;
 }) {
   const navigate = useNavigate();
-  const [address, setAddress] = useState(serverAddress() || window.location.origin);
+  const [address, setAddress] = useState(initialAddress);
+  const [panel, setPanel] = useState(runtime?.mode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   async function connect() {
@@ -22,7 +33,7 @@ export function ServerPage({
     setError("");
     try {
       const version = await ping(address);
-      setServer(address);
+      await setServer(address);
       onConnected({ address: serverAddress(), version });
       await navigate(authToken() ? "/reports" : "/login");
     } catch (reason) {
@@ -33,23 +44,74 @@ export function ServerPage({
   }
   return (
     <main className="access-page">
-      <Card title={t("Connect to your Fortuna server")} className="access-card">
+      <Card
+        title={desktop ? t("Connection mode") : t("Connect to your Fortuna server")}
+        className="access-card"
+      >
         {error && <Alert theme="error" message={error} />}
-        <Form labelAlign="top" onSubmit={() => void connect()}>
-          <Form.FormItem label={t("Server address")} initialData={address}>
-            <Input value={address} onChange={setAddress} placeholder="http://localhost:5000" />
-          </Form.FormItem>
-          <Space>
-            <Button shape="round" type="submit" loading={loading}>
-              {t("Test & connect")}
+        {desktop && (
+          <Radio.Group
+            value={panel}
+            disabled={loading}
+            onChange={(value) => {
+              if (value === "file") {
+                setPanel("file");
+                setError("");
+                return;
+              }
+              if (value !== "builtin" && value !== "remote") return;
+              if (runtime?.mode === value) {
+                setPanel(value);
+                return;
+              }
+              setLoading(true);
+              void switchMode(value).catch((reason) => {
+                setError(String(reason));
+                setLoading(false);
+              });
+            }}
+          >
+            <Radio.Button value="builtin">{t("Built-in")}</Radio.Button>
+            <Radio.Button value="file">{t("Database file")}</Radio.Button>
+            <Radio.Button value="remote">{t("Remote server")}</Radio.Button>
+          </Radio.Group>
+        )}
+        {panel === "file" ? (
+          <>
+            <DatabaseFiles />
+            <Button
+              shape="round"
+              theme="default"
+              variant="text"
+              onClick={() => navigate("/reports")}
+            >
+              {t("Back")}
             </Button>
-            {serverAddress() && (
-              <Button shape="round" variant="outline" onClick={() => navigate("/reports")}>
-                {t("Back")}
-              </Button>
-            )}
+          </>
+        ) : isBuiltin() ? (
+          <Space direction="vertical">
+            <p>{t("Your data is stored on this computer.")}</p>
+            <Button shape="round" theme="default" onClick={() => navigate("/reports")}>
+              {t("Back")}
+            </Button>
           </Space>
-        </Form>
+        ) : (
+          <Form labelAlign="top" onSubmit={() => void connect()}>
+            <Form.FormItem label={t("Server address")} initialData={address}>
+              <Input value={address} onChange={setAddress} placeholder="http://localhost:5000" />
+            </Form.FormItem>
+            <Space>
+              <Button shape="round" type="submit" loading={loading}>
+                {t("Test & connect")}
+              </Button>
+              {serverAddress() && (
+                <Button shape="round" variant="outline" onClick={() => navigate("/reports")}>
+                  {t("Back")}
+                </Button>
+              )}
+            </Space>
+          </Form>
+        )}
       </Card>
     </main>
   );
@@ -140,7 +202,7 @@ export function AuthPage() {
           block
           onClick={() => navigate("/server")}
         >
-          {t("Server")}: {serverAddress()}
+          {runtime?.mode === "file" ? runtime.databaseName : `${t("Server")}: ${serverAddress()}`}
         </Button>
       </Card>
     </main>
