@@ -7,3 +7,5 @@
 **/__pycache__/
 /web/dist/
 *.tsbuildinfo
+
+.DS_Store
