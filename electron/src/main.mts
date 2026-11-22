@@ -311,6 +311,12 @@ async function launch() {
   window = new BrowserWindow({
     width: 1200,
     height: 820,
+    backgroundColor: "#f5f7f6",
+    titleBarStyle: "hidden",
+    titleBarOverlay: process.platform === "darwin"
+      ? true
+      : { color: "#f5f7f6", symbolColor: "#24352f", height: 32 },
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(import.meta.dirname, "preload.cjs"),
       sandbox: true,

@@ -296,7 +296,16 @@ export default function App() {
   }, [language]);
   return (
     <ConfigProvider globalConfig={language === "zh-CN" ? zhCN : enUS}>
-      <HashRouter>{desktopBuild ? <DesktopStartup /> : <Application />}</HashRouter>
+      <HashRouter>
+        {desktopBuild ? (
+          <div className="desktop-shell">
+            <div className="window-drag-region" aria-hidden="true" />
+            <DesktopStartup />
+          </div>
+        ) : (
+          <Application />
+        )}
+      </HashRouter>
     </ConfigProvider>
   );
 }

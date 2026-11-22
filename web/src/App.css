@@ -17,6 +17,32 @@
   height: 100%;
   border-right: 1px solid var(--td-component-stroke);
 }
+.desktop-shell {
+  --caption-height: env(titlebar-area-height, 32px);
+}
+.window-drag-region {
+  position: fixed;
+  top: env(titlebar-area-y, 0px);
+  left: env(titlebar-area-x, 0px);
+  width: env(titlebar-area-width, 100%);
+  height: var(--caption-height);
+  z-index: 3;
+  app-region: drag;
+}
+.desktop-shell .app-layout {
+  height: 100dvh;
+}
+.desktop-shell .workspace-content,
+.desktop-shell .app-sidebar .t-default-menu {
+  padding-top: var(--caption-height);
+}
+.desktop-shell .page {
+  overflow: auto;
+  padding-top: 12px;
+}
+.desktop-shell .access-page {
+  padding-top: max(24px, var(--caption-height));
+}
 .brand {
   font-size: 22px;
   letter-spacing: -0.6px;
