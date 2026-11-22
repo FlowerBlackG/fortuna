@@ -140,6 +140,8 @@ export const zhCN = {
   "Choose reports": "选择报告",
   "Select all in date range": "全选日期范围内的报告",
   "Group by": "分组方式",
+  "Select at least one grouping": "请至少选择一种分组方式",
+  "Report language": "报告语言",
   "Group charts by": "图表分组方式",
   "The start date is after the end date.": "开始日期晚于结束日期。",
   "{0} record(s) cannot be valued. Affected converted report totals appear as gaps in the chart rather than misleading partial values.":

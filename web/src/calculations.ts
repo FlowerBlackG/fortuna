@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-import { getLanguage, t } from "./i18n";
+import { getLanguage, translate } from "./i18n";
 import type { AssetRecord, CustomField, CurrencyTotal, ExchangeRate, Metadata } from "./types";
 
 export function customFields(value: unknown): CustomField[] {
@@ -98,13 +98,13 @@ export function totals(records: AssetRecord[], rates: ExchangeRate[], target = "
   }
   return { amounts, missing };
 }
-export function number(value: number, decimals: number) {
+export function number(value: number, decimals: number, language = getLanguage()) {
   return Number.isFinite(value)
-    ? value.toLocaleString(getLanguage(), {
+    ? value.toLocaleString(language, {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       })
-    : t("Invalid value");
+    : translate(language, "Invalid value");
 }
 export function formatEffectiveValue(
   record: AssetRecord,
@@ -112,19 +112,23 @@ export function formatEffectiveValue(
   target: string,
   decimals: number,
   currencyName: (id: string) => string,
+  language = getLanguage(),
 ) {
   const effective = record.amount * record.effective_rate;
-  const original = `${number(effective, decimals)} ${currencyName(record.currency_id)}`;
+  const original = `${number(effective, decimals, language)} ${currencyName(record.currency_id)}`;
   if (!target || target === record.currency_id) return original;
   const factor = conversion(rates, record.currency_id, target);
   const converted =
     factor === null
-      ? t("No conversion path")
-      : `${number(effective * factor, decimals)} ${currencyName(target)}`;
+      ? translate(language, "No conversion path")
+      : `${number(effective * factor, decimals, language)} ${currencyName(target)}`;
   return `${original} (${converted})`;
 }
-export function reportTitle(report: { title: string; report_time: string }) {
-  return report.title.trim() || new Date(report.report_time).toLocaleString(getLanguage());
+export function reportTitle(
+  report: { title: string; report_time: string },
+  language = getLanguage(),
+) {
+  return report.title.trim() || new Date(report.report_time).toLocaleString(language);
 }
 
 export function chartCurrency(metadata: Metadata, selected = ""): string {
@@ -153,7 +157,12 @@ export function convertTotals(amounts: CurrencyTotal[], rates: ExchangeRate[], c
   return Number.isFinite(value) ? value : null;
 }
 
-export type GroupBy = "asset_type_id" | "institution_id" | "currency_id";
+export const reportGroupings = [
+  { key: "institution_id", label: "By institution" },
+  { key: "asset_type_id", label: "By asset type" },
+  { key: "currency_id", label: "By currency" },
+] as const;
+export type GroupBy = (typeof reportGroupings)[number]["key"];
 
 export function distribution(
   records: AssetRecord[],

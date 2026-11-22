@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-import { getLanguage, t } from "./i18n";
+import { t, translate, type Language } from "./i18n";
 import { exportFonts } from "./exportFonts";
 import { zipSync } from "fflate";
 import { jsPDF } from "jspdf";
@@ -8,7 +8,14 @@ import ExcelJS from "exceljs";
 import fontUrl from "@expo-google-fonts/noto-sans-sc/400Regular/NotoSansSC_400Regular.ttf?url";
 import { formatReportField, mergeReportFields, reportFields } from "./reportFields";
 import { addPdfBookmarks, type PdfBookmark } from "./pdfBookmarks";
-import { formatEffectiveValue, number, reportTitle, totals } from "./calculations";
+import {
+  formatEffectiveValue,
+  number,
+  reportGroupings,
+  reportTitle,
+  totals,
+  type GroupBy,
+} from "./calculations";
 import type { AssetRecord, Metadata, Report } from "./types";
 
 interface Section {
@@ -32,6 +39,11 @@ export interface ReportExport {
   metadata: Metadata;
   currency: string;
   decimals: number;
+}
+
+interface ConfiguredReport extends ReportExport {
+  language: Language;
+  groupings: GroupBy[];
   selectedFields?: ReadonlySet<string>;
 }
 
@@ -41,8 +53,11 @@ function reportSections({
   metadata,
   currency,
   decimals,
+  language,
+  groupings,
   selectedFields,
-}: ReportExport): ReportView[] {
+}: ConfiguredReport): ReportView[] {
+  const t = translate.bind(null, language);
   const names = new Map(metadata.currencies.map((item) => [item.currency_id, item.name]));
   const currencyName = (id: string) => names.get(id) ?? t("Missing currency");
   const types = new Map(metadata.asset_types.map((item) => [item.asset_type_id, item]));
@@ -79,7 +94,7 @@ function reportSections({
     asset_type_id: t("Asset type"),
     currency_id: t("Currency"),
   };
-  const keys = ["institution_id", "asset_type_id", "currency_id"] as const;
+  const keys = reportGroupings.map(({ key }) => key);
   const financial = [t("Amount"), t("Effective rate"), t("Effective value")];
   const amounts = [3, 5];
   const valued = records.map((record) => {
@@ -90,7 +105,7 @@ function reportSections({
     };
     const effective =
       currency && currency !== record.currency_id
-        ? formatEffectiveValue(record, rates, currency, decimals, currencyName)
+        ? formatEffectiveValue(record, rates, currency, decimals, currencyName, language)
         : record.amount * record.effective_rate;
     const row: (string | number)[] = [record.amount, record.effective_rate, effective];
     return {
@@ -99,12 +114,8 @@ function reportSections({
       row: row.map((v) => (typeof v === "number" && !Number.isFinite(v) ? t("Invalid value") : v)),
     };
   });
-  const namesByGroup = {
-    institution_id: t("By institution"),
-    asset_type_id: t("By asset type"),
-    currency_id: t("By currency"),
-  };
-  return keys.map((key) => {
+  const selectedGroups = reportGroupings.filter(({ key }) => groupings.includes(key));
+  return selectedGroups.map(({ key, label }) => {
     const others = keys.filter((k) => k !== key);
     const columns = [t("Content"), ...others.map((k) => dimensions[k]), ...financial];
     const groups = new Map<string, typeof valued>();
@@ -130,7 +141,7 @@ function reportSections({
             record.content,
             ...others.map((k) => labels[k]),
             ...row,
-            ...displayed.map((column) => formatReportField(record, column)),
+            ...displayed.map((column) => formatReportField(record, column, language)),
           ]),
         };
         if (currency) {
@@ -148,9 +159,9 @@ function reportSections({
         }
         return section;
       })
-      .sort((a, b) => a.title.localeCompare(b.title, getLanguage()));
+      .sort((a, b) => a.title.localeCompare(b.title, language));
     return {
-      name: namesByGroup[key],
+      name: t(label),
       sections: [
         ...sections,
         ...(sorted.length ? sorted : [{ title: t("Records"), columns, rows: [] }]),
@@ -159,7 +170,13 @@ function reportSections({
   });
 }
 
-async function workbook(title: string, date: string, views: ReportView[], decimals: number) {
+async function workbook(
+  title: string,
+  date: string,
+  views: ReportView[],
+  decimals: number,
+  language: Language,
+) {
   const book = new ExcelJS.Workbook();
   const fonts = exportFonts();
   const format = decimals ? `#,##0.${"0".repeat(decimals)}` : "#,##0";
@@ -200,12 +217,12 @@ async function workbook(title: string, date: string, views: ReportView[], decima
       sheet.mergeCells(row.number, 1, row.number, width);
     }
     heading(title, 18);
-    add([t("Report time"), date], 11, false, [1]);
+    add([translate(language, "Report time"), date], 11, false, [1]);
     for (const section of view.sections) {
       sheet.addRow([]);
       heading(section.title, 13);
       if (!section.rows.length) {
-        add([t("None")]);
+        add([translate(language, "None")]);
         continue;
       }
       add(section.columns, 11, true).eachCell((cell) => {
@@ -233,17 +250,18 @@ function layoutPdfTable(
   doc: jsPDF,
   section: Section,
   decimals: number,
+  language: Language,
   font: string,
   bold: "normal" | "bold",
 ) {
   const formatRow = (row: (string | number)[]) =>
     row.map((value, i) =>
       typeof value === "number" && section.amounts?.includes(i)
-        ? number(value, decimals)
+        ? number(value, decimals, language)
         : String(value),
     );
   const columns = section.rows.length ? section.columns : [""];
-  const body = section.rows.length ? section.rows.map(formatRow) : [[t("None")]];
+  const body = section.rows.length ? section.rows.map(formatRow) : [[translate(language, "None")]];
   const foot = section.footer ? [formatRow(section.footer)] : [];
   function textWidth(text: string, limit: number) {
     let width = 0;
@@ -279,7 +297,13 @@ function layoutPdfTable(
   };
 }
 
-async function pdfDocument(title: string, date: string, views: ReportView[], decimals: number) {
+async function pdfDocument(
+  title: string,
+  date: string,
+  views: ReportView[],
+  decimals: number,
+  language: Language,
+) {
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "pt",
@@ -307,7 +331,7 @@ async function pdfDocument(title: string, date: string, views: ReportView[], dec
   const layouts = views.map((view) => ({
     name: view.name,
     tables: view.sections.map((section) => {
-      const table = layoutPdfTable(doc, section, decimals, font, bold);
+      const table = layoutPdfTable(doc, section, decimals, language, font, bold);
       pageWidth = Math.max(pageWidth, table.width + 2 * margin);
       return table;
     }),
@@ -353,7 +377,7 @@ async function pdfDocument(title: string, date: string, views: ReportView[], dec
       startY: y,
       body: [
         [{ content: lines, styles: { fontSize: 19, fontStyle: bold } }],
-        [`${view.name}   ·   ${t("Report time")}  ${date}`],
+        [`${view.name}   ·   ${translate(language, "Report time")}  ${date}`],
       ],
     });
     for (const table of view.tables) {
@@ -417,19 +441,20 @@ async function pdfDocument(title: string, date: string, views: ReportView[], dec
   return new Uint8Array(doc.output("arraybuffer"));
 }
 
-export async function downloadReport(input: ReportExport) {
-  const title = reportTitle(input.report);
-  const date = new Date(input.report.report_time).toLocaleString(getLanguage());
+export async function downloadReport(input: ConfiguredReport) {
+  const { language, decimals } = input;
+  const title = reportTitle(input.report, language);
+  const date = new Date(input.report.report_time).toLocaleString(language);
   const sections = reportSections(input);
   const [xlsx, pdf] = await Promise.all([
-    workbook(title, date, sections, input.decimals),
-    pdfDocument(title, date, sections, input.decimals),
+    workbook(title, date, sections, decimals, language),
+    pdfDocument(title, date, sections, decimals, language),
   ]);
   const base =
     title
       .replace(/[\p{Cc}<>:"/\\|?*]/gu, "_")
       .slice(0, 90)
-      .replace(/[. ]+$/, "") || t("Report");
+      .replace(/[. ]+$/, "") || translate(language, "Report");
   const zip = zipSync({ [`${base}.xlsx`]: xlsx, [`${base}.pdf`]: pdf }, { level: 0 });
   const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
   const link = document.createElement("a");

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-import { t, useLanguage, setLanguage } from "../i18n";
+import { t, useLanguage, setLanguage, languageOptions } from "../i18n";
 import { defaultFonts, fontRoles, savedFont, setFont, type FontRole } from "../exportFonts";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -491,10 +491,7 @@ function Preferences() {
         <EditorField label={t("Language")}>
           <Select
             value={language}
-            options={[
-              { value: "en-US", label: "English" },
-              { value: "zh-CN", label: "简体中文" },
-            ]}
+            options={languageOptions}
             onChange={(value) => setLanguage(value === "zh-CN" ? "zh-CN" : "en-US")}
           />
         </EditorField>

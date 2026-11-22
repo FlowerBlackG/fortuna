@@ -468,11 +468,11 @@ try {
   await api("PATCH", `/records/${depositRecord.record_id}`, {
     institution_id: bank.institution_id,
   });
-  await page
+  const exportButton = page
     .getByRole("row")
     .filter({ has: page.getByRole("link", { name: "Snapshot 2" }) })
-    .getByRole("button", { name: "导出报告" })
-    .click();
+    .getByRole("button", { name: "导出报告" });
+  await exportButton.click();
   const exportDialog = page.locator(".t-dialog:visible");
   const cashField = formItem(exportDialog, /^Cash$/).getByRole("checkbox", { name: "Reference" });
   await expect(cashField).toBeChecked();
@@ -541,6 +541,36 @@ try {
   assert.equal(new Set(pages.map(([box]) => box)).size, 1);
   assert.ok(Number(pages[0][1]) > 842);
   assert.match(pdf, /\/PageMode \/UseOutlines/);
+  await exportButton.click();
+  const groups = formItem(exportDialog, /^分组方式$/);
+  for (const label of ["按机构", "按货币", "按资产类型"]) {
+    await groups.getByText(label, { exact: true }).click();
+  }
+  await expect(exportDialog.getByRole("button", { name: "导出", exact: true })).toBeDisabled();
+  await groups.getByText("按资产类型", { exact: true }).click();
+  await formItem(exportDialog, /^报告语言$/)
+    .locator(".t-select")
+    .click();
+  await page.locator(".t-select-option:visible").getByText("English", { exact: true }).click();
+  const [englishDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    exportDialog.getByRole("button", { name: "导出", exact: true }).click(),
+  ]);
+  const englishArchive = unzipSync(await readFile(await englishDownload.path()));
+  const englishBook = new ExcelJS.Workbook();
+  await englishBook.xlsx.load(englishArchive["Snapshot 2.xlsx"]);
+  assert.deepEqual(
+    englishBook.worksheets.map((s) => s.name),
+    ["By asset type"],
+  );
+  assert.equal(englishBook.worksheets[0].getCell("A2").text, "Report time");
+  const englishPdf = Buffer.from(englishArchive["Snapshot 2.pdf"]).toString("latin1");
+  const titles = [...englishPdf.matchAll(/\/Title <FEFF([\da-f]+)>/gi)].map(([, hex]) =>
+    Buffer.from(hex, "hex").swap16().toString("utf16le"),
+  );
+  assert.deepEqual(titles, ["By asset type", "Cash", "Deposit"]);
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  assert.equal(await page.evaluate(() => localStorage.getItem("fortuna.language")), "zh-CN");
   assert.deepEqual(errors, []);
   assert.deepEqual(await page.evaluate(() => window.fortunaErrors), []);
   console.log(

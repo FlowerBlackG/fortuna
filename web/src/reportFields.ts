@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { customFields, validFieldValue } from "./calculations";
 import { displayValue } from "./helpers";
-import { t } from "./i18n";
+import { getLanguage, translate } from "./i18n";
 import type { AssetRecord, AssetType, CustomField } from "./types";
 
 export interface ReportField {
@@ -67,12 +67,16 @@ export function reportFieldValue(record: AssetRecord, column: ReportColumn): unk
     : null;
 }
 
-export function formatReportField(record: AssetRecord, column: ReportColumn): string | number {
+export function formatReportField(
+  record: AssetRecord,
+  column: ReportColumn,
+  language = getLanguage(),
+): string | number {
   const source = column.byType.get(record.asset_type_id);
   if (!source) return "";
   const value: unknown = reportFieldValue(record, column);
   const { field } = source;
-  if (!validFieldValue(field, value)) return t("Needs correction");
+  if (!validFieldValue(field, value)) return translate(language, "Needs correction");
   if (value === null) return "—";
   if (typeof value === "number" && !field.prefix && !field.postfix) return value;
   return `${field.prefix}${displayValue(value)}${field.postfix}`;

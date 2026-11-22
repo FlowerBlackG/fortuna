@@ -2,7 +2,11 @@
 import { useSyncExternalStore } from "react";
 import { zhCN } from "./zhCN";
 
-type Language = "en-US" | "zh-CN";
+export type Language = "en-US" | "zh-CN";
+export const languageOptions = [
+  { value: "en-US", label: "English" },
+  { value: "zh-CN", label: "简体中文" },
+];
 const key = "fortuna.language";
 const read = (): Language =>
   typeof window !== "undefined" && window.localStorage.getItem(key) === "zh-CN" ? "zh-CN" : "en-US";
@@ -31,11 +35,15 @@ export function useLanguage() {
   return useSyncExternalStore(subscribe, getLanguage);
 }
 
-export function t(key: keyof typeof zhCN, ...args: (string | number)[]) {
-  const text = language === "zh-CN" ? zhCN[key] : key;
+export function translate(locale: Language, key: keyof typeof zhCN, ...args: (string | number)[]) {
+  const text = locale === "zh-CN" ? zhCN[key] : key;
   return args.length
     ? text.replace(/\{(\d+)\}/g, (_, index: string) => String(args[Number(index)]))
     : text;
+}
+
+export function t(key: keyof typeof zhCN, ...args: (string | number)[]) {
+  return translate(language, key, ...args);
 }
 
 export function serverMessage(message: string) {
