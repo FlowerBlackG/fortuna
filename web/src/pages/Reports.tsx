@@ -401,7 +401,7 @@ function ReportDetail({
     );
   const visible = filterRecords(records, filters, metadata);
   return (
-    <div className="stack">
+    <div className="stack" style={{ gap: 8 }}>
       <div className="page-heading">
         <div
           style={{
