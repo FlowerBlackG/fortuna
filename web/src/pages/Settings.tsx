@@ -750,35 +750,39 @@ export function SettingsPage() {
       <div className="page-heading">
         <h1>{t("Settings")}</h1>
       </div>
-      <Tabs value={tab} onChange={(value) => setTab(String(value))}>
-        <Tabs.TabPanel value="currencies" label={t("Currencies")}>
-          {tab === "currencies" && <MetadataSettings resource="currencies" />}
-        </Tabs.TabPanel>
-        <Tabs.TabPanel value="institutions" label={t("Institutions")}>
-          {tab === "institutions" && <MetadataSettings resource="institutions" />}
-        </Tabs.TabPanel>
-        <Tabs.TabPanel value="asset-types" label={t("Asset types")}>
-          {tab === "asset-types" && <MetadataSettings resource="asset-types" />}
-        </Tabs.TabPanel>
-        <Tabs.TabPanel value="preferences" label={t("Preferences")}>
-          {tab === "preferences" && (
-            <>
-              <Preferences />
-              <FontPreferences />
-            </>
+
+      <Card size="small">
+
+        <Tabs value={tab} onChange={(value) => setTab(String(value))}>
+          <Tabs.TabPanel value="currencies" label={t("Currencies")}>
+            {tab === "currencies" && <MetadataSettings resource="currencies" />}
+          </Tabs.TabPanel>
+          <Tabs.TabPanel value="institutions" label={t("Institutions")}>
+            {tab === "institutions" && <MetadataSettings resource="institutions" />}
+          </Tabs.TabPanel>
+          <Tabs.TabPanel value="asset-types" label={t("Asset types")}>
+            {tab === "asset-types" && <MetadataSettings resource="asset-types" />}
+          </Tabs.TabPanel>
+          <Tabs.TabPanel value="preferences" label={t("Preferences")}>
+            {tab === "preferences" && (
+              <>
+                <Preferences />
+                <FontPreferences />
+              </>
+            )}
+          </Tabs.TabPanel>
+          {!isBuiltin() && (
+            <Tabs.TabPanel value="account" label={t("Account")}>
+              {tab === "account" && <AccountSettings />}
+            </Tabs.TabPanel>
           )}
-        </Tabs.TabPanel>
-        {!isBuiltin() && (
-          <Tabs.TabPanel value="account" label={t("Account")}>
-            {tab === "account" && <AccountSettings />}
-          </Tabs.TabPanel>
-        )}
-        {isLocal() && (
-          <Tabs.TabPanel value="database" label={t("Local database")}>
-            {tab === "database" && <LocalDatabase />}
-          </Tabs.TabPanel>
-        )}
-      </Tabs>
+          {isLocal() && (
+            <Tabs.TabPanel value="database" label={t("Local database")}>
+              {tab === "database" && <LocalDatabase />}
+            </Tabs.TabPanel>
+          )}
+        </Tabs>
+      </Card>
     </>
   );
 }
