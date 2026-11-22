@@ -6,6 +6,7 @@ function invoke<T>(name: keyof DesktopOperations, ...args: unknown[]): Promise<T
   return ipcRenderer.invoke(`fortuna:${name}`, ...args);
 }
 const api: DesktopAPI = {
+  setTheme: preference => invoke('setTheme', preference),
   runtime: () => invoke("runtime"),
   setMode: (mode) => invoke("setMode", mode),
   chooseDatabase: (action) => invoke("chooseDatabase", action),

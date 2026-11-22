@@ -4,6 +4,7 @@ import { Empty } from "tdesign-react";
 import type { ECharts, ECElementEvent } from "echarts/core";
 import { format } from "echarts/core";
 import { Chart } from "./Chart";
+import { useResolvedTheme } from "../theme";
 
 interface Snapshot {
   title: string;
@@ -43,6 +44,7 @@ function tooltipCard(title: string, rows: [string, string][], total: string) {
 }
 
 export function StackedChart({ points, groups, groupLabel, currencyName, money }: ChartProps) {
+  const totalColor = useResolvedTheme() === "dark" ? "#d9e8df" : "#24352f";
   function bindEvents(chart: ECharts) {
     let visible = groups;
     const hide = () => chart.dispatchAction({ type: "hideTip" });
@@ -166,7 +168,7 @@ export function StackedChart({ points, groups, groupLabel, currencyName, money }
             type: "line",
             triggerEvent: true,
             symbolSize: 6,
-            itemStyle: { color: "#24352f" },
+            itemStyle: { color: totalColor },
             lineStyle: { width: 2, type: "dashed" },
             data: points.map((p) => [p.time, p.total]),
           },
@@ -177,6 +179,7 @@ export function StackedChart({ points, groups, groupLabel, currencyName, money }
 }
 
 export function ReportSankey({ points, groups, groupLabel, money }: ChartProps) {
+  const totalColor = useResolvedTheme() === "dark" ? "#d9e8df" : "#24352f";
   const single = points.length === 1;
   const nodes = [];
   const links = [];
@@ -192,7 +195,7 @@ export function ReportSankey({ points, groups, groupLabel, money }: ChartProps) 
         name: "total",
         depth: 0,
         label: { formatter: hasNegative ? t("Absolute balances") : t("Total") },
-        itemStyle: { color: "#24352f" },
+        itemStyle: { color: totalColor },
         index,
       });
     let empty = true;

@@ -2,6 +2,7 @@
 import type { IResponse } from "./response.js";
 
 export type ConnectionMode = "builtin" | "file" | "remote";
+export type ThemePreference = "system" | "dark" | "light";
 export interface DesktopRuntime {
   mode: ConnectionMode;
   remote: string;
@@ -10,6 +11,7 @@ export interface DesktopRuntime {
   error: string;
 }
 export interface DesktopAPI {
+  setTheme(preference: ThemePreference): Promise<void>;
   runtime(): Promise<DesktopRuntime>;
   setMode(mode: ConnectionMode): Promise<DesktopRuntime>;
   chooseDatabase(action: "open" | "create"): Promise<boolean>;

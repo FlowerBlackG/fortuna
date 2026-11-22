@@ -182,9 +182,26 @@ try {
   await expect(page.getByRole("row").filter({ hasText: "Server build" })).toContainText(
     /\d{4}-\d{2}-\d{2} \d{2}:\d{2} (CST|[+-]\d{1,2}(:\d{2})?)/,
   );
-  await nav.getByRole("button", { name: "Collapse sidebar" }).click();
+  const toggle = await nav.getByRole("button", { name: "Collapse sidebar" }).boundingBox();
+  const actions = nav.locator(".sidebar-actions button");
+  await expect(actions).toHaveCount(3);
+  const bounds = () =>
+    actions.evaluateAll((buttons) =>
+      buttons.map((button) => button.getBoundingClientRect().toJSON()),
+    );
+  const row = await bounds();
+  assert.ok(row.every((button) => button.y === toggle.y && button.width === button.height));
+  assert.ok(row[0].right <= row[1].left && row[1].right <= row[2].left);
+  const toggleAtSamePoint = () =>
+    page.mouse.click(toggle.x + toggle.width / 2, toggle.y + toggle.height / 2);
+  await toggleAtSamePoint();
+  await expect(nav.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  const column = await bounds();
+  assert.ok(column.every((button) => button.x === toggle.x && button.right < 64));
+  assert.ok(column[1].bottom <= column[2].top && column[2].bottom <= column[0].top);
   await nav.getByRole("link", { name: "Settings", exact: true }).click();
-  await nav.getByRole("button", { name: "Expand sidebar" }).click();
+  await toggleAtSamePoint();
+  await expect(nav.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add currency", exact: true })).toBeEnabled();
   const beforeAdd = metadataRequests;
   let failedRefreshes = 0;
@@ -444,6 +461,14 @@ try {
   await api("PATCH", `/currencies/${usd.currency_id}`, { name: "USD美元" });
   await nav.getByRole("link", { name: "Settings" }).click();
   await page.getByText("Preferences", { exact: true }).click();
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.getByText("Dark", { exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("theme-mode", "dark");
+  await page.getByText("Follow system", { exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("theme-mode", "light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveAttribute("theme-mode", "dark");
+  await page.emulateMedia({ colorScheme: "light" });
   await formItem(page, /^Language$/)
     .locator(".t-select")
     .click();

@@ -73,9 +73,9 @@ function WorkspaceMenu() {
           </Space>
         }
         operations={
-          <Space direction={collapsed ? "vertical" : "horizontal"} size="small">
+          <div className="sidebar-actions">
             <Button
-              shape="round"
+              shape="circle"
               variant="text"
               icon={collapsed ? <MenuUnfoldIcon /> : <MenuFoldIcon />}
               aria-expanded={!collapsed}
@@ -83,30 +83,32 @@ function WorkspaceMenu() {
               title={toggleLabel}
               onClick={() => setCollapsed(!collapsed)}
             />
-            <Button
-              shape="round"
-              variant="text"
-              icon={<ServerIcon />}
-              aria-label={t("Server")}
-              title={t("Server")}
-              onClick={() => navigate("/server")}
-            />
-            {!isBuiltin() && (
+            <Space direction={collapsed ? "vertical" : "horizontal"} size={4}>
               <Button
-                shape="round"
+                shape="circle"
                 variant="text"
-                icon={<LogoutIcon />}
-                aria-label={t("Log out")}
-                title={t("Log out")}
-                onClick={() =>
-                  action(async () => {
-                    await request("POST", "/logout");
-                    setToken("");
-                  })
-                }
+                icon={<ServerIcon />}
+                aria-label={t("Server")}
+                title={t("Server")}
+                onClick={() => navigate("/server")}
               />
-            )}
-          </Space>
+              {!isBuiltin() && (
+                <Button
+                  shape="circle"
+                  variant="text"
+                  icon={<LogoutIcon />}
+                  aria-label={t("Log out")}
+                  title={t("Log out")}
+                  onClick={() =>
+                    action(async () => {
+                      await request("POST", "/logout");
+                      setToken("");
+                    })
+                  }
+                />
+              )}
+            </Space>
+          </div>
         }
       >
         <Menu.MenuItem value="reports" href="#/reports" icon={<FileIcon />}>

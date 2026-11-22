@@ -10,6 +10,7 @@ import {
   Form,
   Input,
   Popconfirm,
+  Radio,
   Select,
   Space,
   Table,
@@ -25,6 +26,7 @@ import {
   RefreshIcon,
 } from "tdesign-icons-react";
 import { request, setToken } from "../api";
+import { setTheme, useThemePreference } from "../theme";
 import { desktop, isBuiltin, isLocal, runtime, switchMode } from "../desktop";
 import { DatabaseFiles } from "../components/DatabaseFiles";
 import { action, selectString, settingsObject, showError } from "../helpers";
@@ -457,6 +459,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
 
 function Preferences() {
   const language = useLanguage();
+  const theme = useThemePreference();
   const { metadata, update, loading } = useMetadata();
   const [saving, setSaving] = useState(false);
   const settings = settingsObject(metadata.settings);
@@ -496,6 +499,19 @@ function Preferences() {
         />
       )}
       <Form labelAlign="top">
+        <EditorField label={t("Appearance")}>
+          <Radio.Group
+            variant="default-filled"
+            value={theme}
+            onChange={(value) => {
+              if (value === "system" || value === "light" || value === "dark") setTheme(value);
+            }}
+          >
+            <Radio.Button value="system">{t("Follow system")}</Radio.Button>
+            <Radio.Button value="light">{t("Light")}</Radio.Button>
+            <Radio.Button value="dark">{t("Dark")}</Radio.Button>
+          </Radio.Group>
+        </EditorField>
         <EditorField label={t("Language")}>
           <Select
             value={language}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MulanPSL-2.0
-import { app, BrowserWindow, dialog, ipcMain, protocol, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell } from "electron";
 import { existsSync, mkdirSync, mkdtempSync, rmdirSync } from "node:fs";
 import { readFile, realpath, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -172,6 +172,10 @@ function handle<K extends keyof DesktopOperations>(
 }
 
 function installBridge() {
+  handle('setTheme', preference => {
+    if (preference !== 'system' && preference !== 'light' && preference !== 'dark') throw new Error('Invalid theme preference');
+    nativeTheme.themeSource = preference;
+  });
   handle("runtime", () => serialize(runtime));
   handle("setMode", (mode) =>
     serialize(async () => {
@@ -298,6 +302,12 @@ function installProtocol(root: string) {
   });
 }
 
+function windowPalette() {
+  return nativeTheme.shouldUseDarkColors
+    ? {color: '#181c1a', symbolColor: '#e3ebe6'}
+    : {color: '#f5f7f6', symbolColor: '#24352f'};
+}
+
 async function launch() {
   const assets = app.isPackaged
     ? path.join(app.getAppPath(), "ui")
@@ -311,11 +321,11 @@ async function launch() {
   window = new BrowserWindow({
     width: 1200,
     height: 820,
-    backgroundColor: "#f5f7f6",
+    backgroundColor: windowPalette().color,
     titleBarStyle: "hidden",
     titleBarOverlay: process.platform === "darwin"
       ? true
-      : { color: "#f5f7f6", symbolColor: "#24352f", height: 32 },
+      : { ...windowPalette(), height: 32 },
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(import.meta.dirname, "preload.cjs"),
@@ -325,6 +335,11 @@ async function launch() {
       webviewTag: false,
       navigateOnDragDrop: false,
     },
+  });
+  nativeTheme.on('updated', () => {
+    const palette = windowPalette();
+    window?.setBackgroundColor(palette.color);
+    if (process.platform === 'win32') window?.setTitleBarOverlay(palette);
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-frame-navigate", (event) => {

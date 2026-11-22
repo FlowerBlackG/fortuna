@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 export const zhCN = {
+  Appearance: "外观",
+  "Follow system": "跟随系统",
+  Light: "浅色",
+  Dark: "深色",
   "Connection mode": "连接模式",
   "Built-in": "内置",
   "Remote server": "远程服务器",
