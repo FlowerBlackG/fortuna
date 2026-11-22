@@ -443,7 +443,7 @@ try {
     8,
   );
   await api("PUT", "/settings", { settings: { default_currency: cny.currency_id } });
-  await page.getByRole("link", { name: "← All reports", exact: true }).click();
+  await page.getByRole("button", { name: "Back to all reports", exact: true }).click();
   await page.getByRole("cell", { name: "Incomplete — missing conversion", exact: true }).waitFor();
   await page.getByRole("cell", { name: "156.00 CNY", exact: true }).waitFor();
   await page.getByText("Analysis", { exact: true }).first().click();

@@ -78,7 +78,7 @@ export const zhCN = {
   "Delete failed": "删除失败",
   "Loading report…": "正在加载报告…",
   Retry: "重试",
-  "← All reports": "← 所有报告",
+  "Back to all reports": "返回所有报告",
   Editing: "编辑模式",
   "Report title (optional)": "报告标题（选填）",
   "{0} of {1} records": "显示 {0} 条，共 {1} 条记录",

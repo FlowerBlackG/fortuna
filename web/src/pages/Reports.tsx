@@ -17,7 +17,7 @@ import {
   Table,
 } from "tdesign-react";
 import type { PrimaryTableCol } from "tdesign-react";
-import { DeleteIcon, DownloadIcon, RefreshIcon } from "tdesign-icons-react";
+import { ArrowLeftIcon, DeleteIcon, DownloadIcon, RefreshIcon } from "tdesign-icons-react";
 import { request } from "../api";
 import { action, settingsObject, showError } from "../helpers";
 import { useLoad } from "../useLoad";
@@ -256,6 +256,7 @@ function ReportDetail({
   reportId: string;
   serverVersion: ServerInfo;
 }) {
+  const navigate = useNavigate();
   const { metadata, refresh: refreshMetadata, ensure } = useMetadata();
   const [records, setRecords] = useState<AssetRecord[]>([]);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
@@ -402,30 +403,55 @@ function ReportDetail({
   return (
     <div className="stack">
       <div className="page-heading">
-        <div>
-          <Link to="/reports">{t("← All reports")}</Link>
-          <h1>{state.data ? reportTitle({ ...state.data.report, title }) : t("Report")}</h1>
-          {!editable && state.data && (
-            <p className="muted">
-              {t("Report time")}:{" "}
-              {new Date(state.data.report.report_time).toLocaleString(getLanguage())}
-            </p>
-          )}
-        </div>
-        <Space>
-          <span>{t("Editing")}</span>
-          <Switch
-            value={editable}
-            disabled={unsynced}
-            onChange={(value) => setEditable(Boolean(value))}
-          />
-        </Space>
-      </div>
-      <Card>
-        {editable && (
-          <div className="toolbar">
-            {state.data && (
+        <div
+          style={{
+            height: '5rem',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '0.68rem',
+              alignItems: 'center',
+              height: '2.5rem',
+            }}
+          >
+            <Button
+              shape="circle"
+              style={{
+                flexShrink: 0,
+              }}
+              icon={<ArrowLeftIcon />}
+              aria-label={t("Back to all reports")}
+              title={t("Back to all reports")}
+              onClick={() => navigate("/reports")}
+            />
+
+            {
+              editable ?
+                <Input
+                  style={{ maxWidth: 500}}
+                  value={title}
+                  onChange={setTitle}
+                  onBlur={saveTitle}
+                  onEnter={saveTitle}
+                  placeholder={t("Report title (optional)")}
+                />
+
+              :
+
+                <h1>{state.data ? reportTitle({ ...state.data.report, title }) : t("Report")}</h1>
+            }
+
+          </div>
+          
+          {
+            (editable && state.data) ?
               <DatePicker
+                style={{
+                  marginTop: '0.5rem',
+                }}
                 label={t("Report time")}
                 enableTimePicker
                 allowInput
@@ -437,15 +463,37 @@ function ReportDetail({
                   if (typeof value === "number") action(() => saveTime(value));
                 }}
               />
-            )}
-            <Input
-              style={{ maxWidth: 500 }}
-              value={title}
-              onChange={setTitle}
-              onBlur={saveTitle}
-              onEnter={saveTitle}
-              placeholder={t("Report title (optional)")}
-            />
+            :
+            
+            <p className="muted"
+              style={{
+                visibility: (!editable && state.data) ? "visible" : "hidden",
+              }}
+            >
+              {t("Report time")}:{" "}
+              { state.data &&
+                new Date(state.data.report.report_time).toLocaleString(getLanguage())
+              }
+            </p>
+          }
+        </div>
+        <Space>
+          <span>{t("Editing")}</span>
+          <Switch
+            value={editable}
+            disabled={unsynced}
+            onChange={(value) => setEditable(Boolean(value))}
+          />
+        </Space>
+      </div>
+      <Card>
+        {(
+          <div className="toolbar"
+            style={{
+              visibility: editable ? "visible" : "hidden",
+            }}
+          >
+            
             <span className="muted">{titleStatus && t(titleStatus)}</span>
             {titleStatus === "Title not saved — click Retry" && (
               <Button shape="round" variant="text" onClick={saveTitle}>

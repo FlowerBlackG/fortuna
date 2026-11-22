@@ -425,7 +425,7 @@ function MetadataSettings({ resource }: { resource: Resource }) {
     },
   ];
   return (
-    <Card className="settings-section">
+    <Card bordered={false} className="settings-section">
       <div className="toolbar">
         <Button shape="round" disabled={loading} onClick={() => open()}>
           {t(`Add ${resourceNames[resource]}`)}
@@ -486,7 +486,7 @@ function Preferences() {
     }
   }
   return (
-    <Card title={t("Display preferences")} className="settings-section">
+    <Card bordered={false} title={t("Display preferences")} className="settings-section">
       {malformed && (
         <Alert
           theme="warning"
@@ -550,7 +550,7 @@ function FontPreferences() {
     setNames((previous) => ({ ...previous, [role]: name }));
   }
   return (
-    <Card title={t("Excel export fonts")} className="settings-section">
+    <Card bordered={false} title={t("Excel export fonts")} className="settings-section">
       <Form labelAlign="top">
         <div className="form-grid">
           {fontRoles.map((role) => (
@@ -609,7 +609,7 @@ function AccountSettings() {
     }
   }
   return (
-    <Card title={t("Account")} className="settings-section">
+    <Card bordered={false} title={t("Account")} className="settings-section">
       {state.error && <Alert theme="error" message={state.error} />}
       <Form labelAlign="top" onSubmit={() => action(save)}>
         <Form.FormItem label={t("Username")}>
@@ -686,7 +686,7 @@ function LocalDatabase() {
     }
   }
   return (
-    <Card title={t("Local database")} className="settings-section">
+    <Card bordered={false} title={t("Local database")} className="settings-section">
       <div className="stack">
         <section className="database-current">
           <div>
