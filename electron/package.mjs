@@ -17,6 +17,7 @@ if (
 ) {
   throw new Error("Set Apple notarization credentials for the signed release");
 }
+const { desktopIconPath } = await import("./prepare-icon.mjs");
 for (const target of mac ? ["dir"] : ["nsis", "zip"]) {
   const portable = win && target === "zip";
   await build({
@@ -29,7 +30,7 @@ for (const target of mac ? ["dir"] : ["nsis", "zip"]) {
     config: {
       appId: "org.flowerblackg.fortuna",
       productName: "Fortuna",
-      icon: "icon.png",
+      icon: desktopIconPath,
       artifactName: `Fortuna-\${version}-\${os}-\${arch}${portable ? "-portable" : ""}${signed ? "" : "-dev"}.\${ext}`,
       directories: {
         buildResources: "resources",

@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import electron from "electron";
 import { watchDesktopRenderer } from "../web/desktop-watch.mjs";
+import "./prepare-icon.mjs";
 
 const cwd = import.meta.dirname;
 const tsc = fileURLToPath(new URL("./bin/tsc", import.meta.resolve("typescript/package.json")));

@@ -314,7 +314,11 @@ async function launch() {
   const assets = app.isPackaged
     ? path.join(app.getAppPath(), "ui")
     : path.join(app.getAppPath(), watching ? "../build/ui-dev" : "../build/ui");
-  const icon = app.isPackaged ? undefined : path.join(app.getAppPath(), "resources/icon.png");
+  const icon = app.isPackaged
+    ? undefined
+    : process.platform === "darwin" || process.platform === "win32"
+      ? path.join(import.meta.dirname, "desktop-icon.png")
+      : path.join(app.getAppPath(), "resources/icon.png");
   if (icon) app.dock?.setIcon(icon);
   installProtocol(assets);
   installBridge();

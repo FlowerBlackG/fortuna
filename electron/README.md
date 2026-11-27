@@ -72,7 +72,7 @@ Desktop builds reuse the frozen backend in `build/backend/` while its source, re
 
 For a one-off launch without watching, run `python electron/build.py --prepare` and `vp -C electron run start`. The shell loads bundled assets through `fortuna://workspace` in both development and packaged builds; watched UI output is kept separate from the packaging output.
 
-Native app icons are built from `electron/resources/icon.png`, a 1024×1024 export of `web/src/assets/fortuna-logo.webp`. Update both files when changing the logo.
+Native app icons are built from `electron/resources/icon.png`, a 1024×1024 export of `web/src/assets/fortuna-logo.webp`. Update both files when changing the logo. On macOS and Windows, `prepare-icon.mjs` generates `build/electron/desktop-icon.png` with rounded corners and transparent padding, using less padding on Windows so the artwork stays readable at small sizes. The development app uses the PNG directly; electron-builder converts it to `.icns` on macOS or `.ico` on Windows.
 
 ```sh
 python electron/build.py          # Native development distribution
