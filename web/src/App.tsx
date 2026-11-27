@@ -14,7 +14,6 @@ import {
   MenuUnfoldIcon,
   ServerIcon,
   SettingIcon,
-  WalletIcon,
 } from "tdesign-icons-react";
 import {
   authToken,
@@ -35,6 +34,7 @@ import {
   switchMode,
 } from "./desktop";
 import { DatabaseFiles } from "./components/DatabaseFiles";
+import { Logo } from "./components/Logo";
 import { MetadataProvider } from "./data";
 import { useMetadata } from "./metadata";
 import { action } from "./helpers";
@@ -68,7 +68,7 @@ function WorkspaceMenu() {
         value={location.pathname.split("/")[1] || "reports"}
         logo={
           <Space align="center">
-            <WalletIcon size="26" />
+            <Logo size={26} alt={collapsed ? "Fortuna" : ""} />
             {!collapsed && <strong className="brand">Fortuna</strong>}
           </Space>
         }

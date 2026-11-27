@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { t } from "../i18n";
-import { WalletIcon } from "tdesign-icons-react";
 import { Card, Descriptions, Tag } from "tdesign-react";
+import { Logo } from "../components/Logo";
 import Version, { type BuildInfo, type ServerInfo } from "../version";
 
 function buildTime(value?: string) {
@@ -27,8 +27,8 @@ export function AboutPage({ server }: { server: ServerInfo }) {
   return (
     <Card className="about-card">
       <header>
-        <WalletIcon size="48" />
-        <h1>Fortuna</h1>
+        <Logo size={48} />
+        <h1 style={{ marginTop: 24 }}>Fortuna</h1>
       </header>
       <Descriptions
         column={1}

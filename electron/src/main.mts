@@ -277,6 +277,7 @@ function installProtocol(root: string) {
     ".woff2": "font/woff2",
     ".svg": "image/svg+xml",
     ".png": "image/png",
+    ".webp": "image/webp",
   };
   protocol.handle("fortuna", async (req) => {
     const url = new URL(req.url);
