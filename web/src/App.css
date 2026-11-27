@@ -61,22 +61,6 @@
 .t-is-collapsed .sidebar-actions {
   flex-direction: column-reverse;
 }
-.about-card {
-  max-width: 460px;
-  margin: clamp(12px, 6vh, 64px) auto;
-}
-.about-card header {
-  text-align: center;
-  color: var(--td-brand-color);
-  margin: 8px 0 28px;
-}
-.about-card h1 {
-  margin: 8px 0;
-  color: var(--td-text-color-primary);
-}
-.about-card td {
-  font-variant-numeric: tabular-nums;
-}
 .muted {
   color: var(--td-text-color-secondary);
 }

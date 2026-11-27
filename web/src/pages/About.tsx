@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { t } from "../i18n";
-import { Card, Descriptions, Tag } from "tdesign-react";
+import { Button, Descriptions, Tag } from "tdesign-react";
 import { Logo } from "../components/Logo";
+import { desktop } from "../desktop";
 import Version, { type BuildInfo, type ServerInfo } from "../version";
 
 function buildTime(value?: string) {
@@ -20,21 +21,51 @@ function buildTime(value?: string) {
 }
 
 export function AboutPage({ server }: { server: ServerInfo }) {
+  const versions = desktop?.versions;
   const builds: ["Server" | "Web", BuildInfo][] = [
-    ["Server", server],
     ["Web", Version],
+    ["Server", server],
   ];
   return (
-    <Card className="about-card">
-      <header>
-        <Logo size={48} />
-        <h1 style={{ marginTop: 24 }}>Fortuna</h1>
-      </header>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      padding: 24,
+    }}>
+
+      <Logo size={48} />
+      <h1 style={{ marginTop: 24 }}>Fortuna</h1>
+
+      <Button
+        style={{ 
+          visibility: "hidden",
+          height: 0,
+          margin: 0,
+          padding: 0
+          // TODO
+        }}
+        onClick={() => {
+          const url = "https://github.com/FlowerBlackG/fortuna"
+          // TODO
+        }}
+      >GitHub</Button>
+
       <Descriptions
         column={1}
+        style={{ marginTop: 24 }}
+        labelStyle={{ paddingInlineEnd: 28 }}
         tableLayout="auto"
         colon={false}
         items={[
+          ...builds.flatMap(([name, build]) => [
+            {
+              label: t(`${name} version`),
+              content: build.code == null ? build.tag : `${build.tag} (${build.code})`,
+            },
+            { label: t(`${name} build`), content: buildTime(build.buildTime) },
+          ]),
+
           {
             label: t("Server environment"),
             content: server.environment ? (
@@ -45,15 +76,15 @@ export function AboutPage({ server }: { server: ServerInfo }) {
               t("Unavailable")
             ),
           },
-          ...builds.flatMap(([name, build]) => [
-            {
-              label: t(`${name} version`),
-              content: build.code == null ? build.tag : `${build.tag} (${build.code})`,
-            },
-            { label: t(`${name} build`), content: buildTime(build.buildTime) },
-          ]),
+
+          ...(versions
+            ? [
+                { label: "Electron", content: versions.electron },
+                { label: "Chromium", content: versions.chromium },
+              ]
+            : []),
         ]}
       />
-    </Card>
+    </div>
   );
 }

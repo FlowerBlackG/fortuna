@@ -7,10 +7,15 @@ export interface DesktopRuntime {
   mode: ConnectionMode;
   remote: string;
   databaseName: string;
+  databasePath?: string;
   fileSession: string;
   error: string;
 }
 export interface DesktopAPI {
+  readonly versions: {
+    readonly electron: string;
+    readonly chromium: string;
+  };
   setTheme(preference: ThemePreference): Promise<void>;
   runtime(): Promise<DesktopRuntime>;
   setMode(mode: ConnectionMode): Promise<DesktopRuntime>;
@@ -29,4 +34,4 @@ export interface DesktopAPI {
   backup(): Promise<boolean>;
   onUnavailable(callback: (message: string) => void): () => void;
 }
-export type DesktopOperations = Omit<DesktopAPI, "onUnavailable">;
+export type DesktopOperations = Omit<DesktopAPI, "versions" | "onUnavailable">;
