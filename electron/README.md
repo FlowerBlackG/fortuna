@@ -51,7 +51,7 @@ With Make available, use these targets from the repository root. Set `PYTHON` to
 
 ```sh
 make desktop-install    # Install Python, web and Electron dependencies
-make desktop            # Build and launch the development app
+make desktop            # Launch the development app and watch for changes
 make desktop-test       # Build and test the backend, shell and database controls
 make desktop-build      # Package for this platform
 make desktop-release    # Require release signing
@@ -63,15 +63,16 @@ You can also run the build directly on either platform. Activate the virtual env
 ```sh
 vp -C web install --frozen-lockfile
 vp -C electron install --frozen-lockfile
-python electron/build.py --prepare
-vp -C electron run start
+python electron/build.py --dev
 ```
 
-The Electron runtime lives in `electron/src/`. After editing it, run `vp -C electron run build` and restart the shell. TypeScript emits the main process and its modules as `.mjs` and the sandboxed preload as `.cjs` under `build/electron/`. Both `--prepare` and distribution builds compile the runtime. `vp -C electron run start` uses the compiled files directly.
+In watch mode, changes to the web UI rebuild the renderer and reload the window. Changes in `electron/src/` or `shared/` rebuild the Electron runtime and restart the app after a successful build. Quit the app or press Ctrl+C to stop watching. After changing Python backend code, quit and rerun `make desktop` to rebuild the frozen backend.
 
 Desktop builds reuse the frozen backend in `build/backend/` while its source, resources, Python environment and bundle are current. `make clean` removes the desktop build intermediates so the next build starts fresh. Workspaces live under the configured data location and packaged distributions live under `build/desktop/`.
 
-Rebuild the renderer with `vp -C web run build:desktop` after changing the UI. The shell loads bundled assets through the `fortuna://workspace` protocol in development and in packaged builds.
+For a one-off launch without watching, run `python electron/build.py --prepare` and `vp -C electron run start`. The shell loads bundled assets through `fortuna://workspace` in both development and packaged builds; watched UI output is kept separate from the packaging output.
+
+Native app icons are built from `electron/resources/icon.png`, a 1024×1024 export of `web/src/assets/fortuna-logo.webp`. Update both files when changing the logo.
 
 ```sh
 python electron/build.py          # Native development distribution

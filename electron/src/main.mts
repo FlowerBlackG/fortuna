@@ -19,6 +19,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.setName("Fortuna");
+const watching = !app.isPackaged && process.connected && app.commandLine.hasSwitch("fortuna-watch");
 if (!app.isPackaged && !app.commandLine.hasSwitch("user-data-dir")) {
   const developmentProfile = path.resolve(app.getAppPath(), "../user-data/desktop");
   mkdirSync(developmentProfile, { recursive: true });
@@ -312,7 +313,9 @@ function windowPalette() {
 async function launch() {
   const assets = app.isPackaged
     ? path.join(app.getAppPath(), "ui")
-    : path.join(app.getAppPath(), "../build/ui");
+    : path.join(app.getAppPath(), watching ? "../build/ui-dev" : "../build/ui");
+  const icon = app.isPackaged ? undefined : path.join(app.getAppPath(), "resources/icon.png");
+  if (icon) app.dock?.setIcon(icon);
   installProtocol(assets);
   installBridge();
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) =>
@@ -322,6 +325,7 @@ async function launch() {
   window = new BrowserWindow({
     width: 1200,
     height: 820,
+    icon,
     backgroundColor: windowPalette().color,
     titleBarStyle: "hidden",
     titleBarOverlay: process.platform === "darwin"
@@ -355,6 +359,12 @@ async function launch() {
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
+  if (watching) {
+    process.on("message", (message) => {
+      if (message === "fortuna:reload" && !quitting) window?.webContents.reload();
+    });
+    process.once("disconnect", () => app.quit());
+  }
   app.on("second-instance", () => {
     window?.restore();
     window?.focus();

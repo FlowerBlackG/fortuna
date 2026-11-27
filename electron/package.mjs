@@ -29,8 +29,12 @@ for (const target of mac ? ["dir"] : ["nsis", "zip"]) {
     config: {
       appId: "org.flowerblackg.fortuna",
       productName: "Fortuna",
+      icon: "icon.png",
       artifactName: `Fortuna-\${version}-\${os}-\${arch}${portable ? "-portable" : ""}${signed ? "" : "-dev"}.\${ext}`,
-      directories: { output: `../build/desktop/${portable ? "portable" : "installed"}` },
+      directories: {
+        buildResources: "resources",
+        output: `../build/desktop/${portable ? "portable" : "installed"}`,
+      },
       extraMetadata: { main: "main.mjs" },
       files: [
         "package.json",

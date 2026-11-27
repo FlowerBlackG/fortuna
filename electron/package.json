@@ -9,6 +9,7 @@
   "type": "module",
   "main": "../build/electron/main.mjs",
   "scripts": {
+    "dev": "node dev.mjs",
     "build": "tsc -p tsconfig.json",
     "start": "electron .",
     "dist": "tsc -p tsconfig.json && node package.mjs",

@@ -47,8 +47,10 @@ def freeze_backend():
 
 def main():
     parser = argparse.ArgumentParser(description='Build Fortuna for this native platform')
-    parser.add_argument('--prepare', action='store_true', help='Build the backend, renderer and Electron runtime for development')
-    parser.add_argument('--signed', action='store_true', help='Require release signing credentials')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--dev', action='store_true', help='Launch the development app and watch for changes')
+    mode.add_argument('--prepare', action='store_true', help='Build the backend, renderer and Electron runtime for development')
+    mode.add_argument('--signed', action='store_true', help='Require release signing credentials')
     args = parser.parse_args()
     if (sys.platform, platform.machine().lower()) not in {('darwin', 'arm64'), ('win32', 'amd64')}:
         parser.error('Use Python for native macOS ARM64 or Windows x64')
@@ -58,10 +60,15 @@ def main():
     if not vp:
         parser.error('Install Vite+ on the build machine')
     freeze_backend()
+    if args.dev:
+        try:
+            return subprocess.run([vp, 'run', 'dev'], cwd=ROOT / 'electron').returncode
+        except KeyboardInterrupt:
+            return 130
     subprocess.run([vp, 'run', 'build:desktop'], cwd=ROOT / 'web', check=True)
     subprocess.run([vp, 'run', 'build' if args.prepare else 'dist', *(['--signed'] if args.signed else [])],
                    cwd=ROOT / 'electron', check=True)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

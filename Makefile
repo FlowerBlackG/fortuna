@@ -29,8 +29,8 @@ desktop-install:
 desktop-prepare:
 	$(PYTHON) electron/build.py --prepare
 
-desktop: desktop-prepare
-	cd electron && vp run start
+desktop:
+	$(PYTHON) electron/build.py --dev
 
 desktop-build:
 	$(PYTHON) electron/build.py
