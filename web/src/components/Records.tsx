@@ -404,7 +404,13 @@ export function RecordTable({
                   {t("Retry")}
                 </Button>
               )}
-              <Popconfirm content={t("Delete this record?")} onConfirm={() => onDelete?.(row)}>
+              <Popconfirm 
+                content={t("Delete this record?")} 
+                theme="danger" 
+                onConfirm={() => onDelete?.(row)}
+                confirmBtn={{theme: "danger", content: t("Delete"), shape: "round"}}
+                cancelBtn={{theme: "default", content: t("Cancel"), shape: "round"}}
+              >
                 <Button
                   shape="round"
                   size="small"
