@@ -156,24 +156,50 @@ try {
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Add record", exact: true }).click();
   dialog = page.locator(".t-dialog:visible");
+  const dropdown = page.locator(".t-select__dropdown:visible");
   await choose(dialog, /^Asset type$/, "Deposit");
+  const assetTypeInput = formItem(dialog, /^Asset type$/).getByRole("textbox");
+  await expect(assetTypeInput).toBeFocused();
+  await expect(dropdown).toHaveCount(0);
   await choose(dialog, /^Institution$/, "Test Bank");
-  await choose(dialog, /^Currency$/, "USD");
+  const currencyInput = formItem(dialog, /^Currency$/).getByRole("textbox");
+  await currencyInput.focus();
+  await expect(dropdown).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dropdown).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await assetTypeInput.focus();
+  await expect(dropdown).toContainText("Deposit");
+  await currencyInput.focus();
+  await currencyInput.fill("USD");
+  await expect(dropdown.locator(".t-select-option")).toHaveText(["USD"]);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(dropdown).toHaveCount(0);
+  await expect(currencyInput).toHaveValue("USD");
+  await expect(dialog).toBeVisible();
+  assert.equal((await api("GET", "/records")).length, 0);
   await formItem(dialog, /^Amount$/)
     .locator("input")
     .fill("100");
   await formItem(dialog, /^Effective rate$/)
     .locator("input")
     .fill("0.7");
-  await formItem(dialog, /^Content$/)
-    .locator("textarea")
-    .fill("Savings\nSecond line");
-  await formItem(dialog, /^Interest/)
-    .locator("input")
-    .fill("5.5");
-  await formItem(dialog, /^Interest/)
-    .locator("input")
-    .press("Enter");
+  const content = formItem(dialog, /^Content$/).getByRole("textbox");
+  await content.fill("Savings\nSecond line");
+  await content.dispatchEvent("compositionstart", {});
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await content.dispatchEvent("compositionend", {});
+  await content.dispatchEvent("keydown", { key: "Escape", code: "Escape", keyCode: 229 });
+  await expect(dialog).toBeVisible();
+  const firstInterest = formItem(dialog, /^Interest/).locator("input");
+  await firstInterest.fill("5.5");
+  await firstInterest.dispatchEvent("compositionstart", {});
+  await firstInterest.dispatchEvent("keydown", { key: "Enter", code: "Enter" });
+  await expect(dialog).toBeVisible();
+  await firstInterest.dispatchEvent("compositionend", {});
+  await firstInterest.press("Enter");
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("cell", { name: "Savings Second line" }).waitFor();
   await page.getByText("Syncing…", { exact: true }).waitFor({ state: "hidden" });
@@ -246,7 +272,7 @@ try {
     .locator(".t-select-option")
     .filter({ hasText: /^Deposit$/ })
     .click();
-  await page.getByRole("heading", { name: "Browser smoke report" }).click();
+  await page.getByText("Display in", { exact: true }).click();
   await page.getByRole("cell", { name: "5.5%", exact: true }).waitFor();
   await page.getByPlaceholder("Minimum", { exact: true }).fill("5");
   await page.getByPlaceholder("Minimum", { exact: true }).press("Tab");
@@ -294,6 +320,8 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${frontend}/#/reports/${reportId}`);
   await page.getByRole("cell", { name: "140.00 USD", exact: true }).waitFor();
+  await expect(page.getByRole("button", { name: "Add record", exact: true })).toHaveCount(0);
+  await page.getByRole("switch", { name: "Editing" }).click();
   records = await api("GET", "/records");
   assert.equal(records[0].amount, 200);
   await page.getByRole("button", { name: "Delete", exact: true }).click();
@@ -347,6 +375,7 @@ try {
   await expect(interest).toHaveValue("3.5");
   await expect(dialog.locator(".t-form__controls.t-is-warning")).toHaveCount(0);
   await choose(dialog, /^Asset type$/, "Cash");
+  await amount.focus();
   await choose(dialog, /^Asset type$/, "Deposit");
   await expect(interest).toHaveValue("");
   await expect(dialog.getByRole("checkbox", { name: "Keep Interest" })).not.toBeChecked();

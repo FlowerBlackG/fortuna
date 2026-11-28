@@ -19,6 +19,7 @@ import { EditorField } from "./Editor";
 import { request } from "../api";
 import { selectString } from "../helpers";
 import { useMetadata } from "../metadata";
+import { useTablePagination } from "../tableState";
 import type { ExchangeRate } from "../types";
 
 export function ReportExchangeRates({
@@ -37,6 +38,7 @@ export function ReportExchangeRates({
   setBusy: (busy: boolean) => void;
 }) {
   const { metadata } = useMetadata();
+  const pagination = useTablePagination(rates.length);
   const [editing, setEditing] = useState<ExchangeRate | null | undefined>();
   const [numerator, setNumerator] = useState("");
   const [denominator, setDenominator] = useState("");
@@ -133,6 +135,7 @@ export function ReportExchangeRates({
         )}
         <Table
           rowKey="key"
+          pagination={pagination}
           data={rates.map((row) => ({
             ...row,
             key: `${row.numerator_currency_id}/${row.denominator_currency_id}`,

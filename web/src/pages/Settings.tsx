@@ -27,13 +27,14 @@ import {
 } from "tdesign-icons-react";
 import { request, setToken } from "../api";
 import { setTheme, useThemePreference } from "../theme";
-import { desktop, isBuiltin, isLocal, runtime, switchMode } from "../desktop";
-import { DatabaseFiles } from "../components/DatabaseFiles";
+import { desktop, isBuiltin, isLocal, switchMode } from "../desktop";
+import { DatabaseFiles, DatabaseName } from "../components/DatabaseFiles";
 import { action, selectString, settingsObject, showError } from "../helpers";
 import { useLoad } from "../useLoad";
 import { useMetadata } from "../metadata";
 import { customFields } from "../calculations";
 import { EditorDialog, EditorField } from "../components/Editor";
+import { useTablePagination, useTableSort } from "../tableState";
 import type { Account, AssetType, Currency, CustomField, Institution, Metadata } from "../types";
 
 type Resource = "currencies" | "institutions" | "asset-types";
@@ -63,29 +64,25 @@ function entries(metadata: Metadata, resource: Resource): MetadataRow[] {
   }));
 }
 
+function upsert<T>(rows: T[], entry: T, id: keyof T): T[] {
+  const index = rows.findIndex((row) => row[id] === entry[id]);
+  return index === -1 ? [...rows, entry] : rows.with(index, entry);
+}
+
 function saveEntry(metadata: Metadata, entry: MetadataEntry): Metadata {
   if ("currency_id" in entry)
     return {
       ...metadata,
-      currencies: [
-        ...metadata.currencies.filter((item) => item.currency_id !== entry.currency_id),
-        entry,
-      ],
+      currencies: upsert(metadata.currencies, entry, "currency_id"),
     };
   if ("institution_id" in entry)
     return {
       ...metadata,
-      institutions: [
-        ...metadata.institutions.filter((item) => item.institution_id !== entry.institution_id),
-        entry,
-      ],
+      institutions: upsert(metadata.institutions, entry, "institution_id"),
     };
   return {
     ...metadata,
-    asset_types: [
-      ...metadata.asset_types.filter((item) => item.asset_type_id !== entry.asset_type_id),
-      entry,
-    ],
+    asset_types: upsert(metadata.asset_types, entry, "asset_type_id"),
   };
 }
 
@@ -333,13 +330,15 @@ function MetadataEditor({
 function MetadataSettings({ resource }: { resource: Resource }) {
   const { metadata, refresh, update, loading } = useMetadata();
   const [editing, setEditing] = useState<MetadataRow | null | undefined>();
+  const rows = entries(metadata, resource);
   function open(id?: string) {
-    setEditing(id ? entries(metadata, resource).find((entry) => entry.id === id) : null);
+    setEditing(id ? rows.find((entry) => entry.id === id) : null);
   }
   const columns: PrimaryTableCol<MetadataRow>[] = [
     {
       colKey: "name",
       title: t("Name"),
+      sorter: (a, b) => a.name.localeCompare(b.name),
       cell: ({ row }) => (
         <Space>
           {"color" in row && (
@@ -424,6 +423,8 @@ function MetadataSettings({ resource }: { resource: Resource }) {
       ),
     },
   ];
+  const sorting = useTableSort(rows, columns);
+  const pagination = useTablePagination(rows.length);
   return (
     <Card bordered={false} className="settings-section">
       <div className="toolbar">
@@ -444,11 +445,11 @@ function MetadataSettings({ resource }: { resource: Resource }) {
       </div>
       <Table
         rowKey="id"
-        data={entries(metadata, resource)}
+        {...sorting}
         columns={columns}
         loading={loading}
         empty={t("No entries yet. Add your first one above.")}
-        pagination={{ total: entries(metadata, resource).length, defaultPageSize: 20 }}
+        pagination={pagination}
       />
       {editing !== undefined && (
         <MetadataEditor resource={resource} initial={editing} close={() => setEditing(undefined)} />
@@ -690,7 +691,7 @@ function LocalDatabase() {
       <div className="stack">
         <section className="database-current">
           <div>
-            <strong>{isBuiltin() ? "fortuna.sqlite3" : runtime?.databaseName}</strong>
+            {isBuiltin() ? <strong>fortuna.sqlite3</strong> : <DatabaseName />}
             <p className="muted">
               {isBuiltin() ? t("Built-in workspace") : t("Database accounts")}
             </p>

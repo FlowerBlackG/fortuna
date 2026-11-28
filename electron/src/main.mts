@@ -129,6 +129,7 @@ async function runtime(): Promise<DesktopRuntime> {
     mode: state.mode,
     remote: state.remote,
     databaseName: path.basename(state.database),
+    databasePath: state.mode === "file" ? state.database : undefined,
     fileSession: state.mode === "file" ? (backend?.sessionId ?? "") : "",
     error: failure,
   };

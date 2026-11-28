@@ -198,6 +198,13 @@
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
+.analysis-tooltip-dot {
+  display: inline-block;
+  width: 0.65em;
+  height: 0.65em;
+  margin-inline-end: 0.45em;
+  border-radius: 50%;
+}
 .sankey-scroll {
   overflow-x: auto;
 }

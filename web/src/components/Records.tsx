@@ -20,7 +20,7 @@ import {
 } from "tdesign-react";
 import type { PrimaryTableCol } from "tdesign-react";
 import { DeleteIcon, EditIcon } from "tdesign-icons-react";
-import { EditorDialog, EditorField } from "./Editor";
+import { EditorDialog, EditorField, FocusSelect } from "./Editor";
 import {
   conversion,
   customFields,
@@ -34,7 +34,7 @@ import { displayValue, selectString } from "../helpers";
 import { emptyFilters } from "../recordState";
 import type { RecordFilters } from "../recordState";
 import type { AssetRecord, CustomField, ExchangeRate } from "../types";
-import { useTableSort } from "../tableState";
+import { useTablePagination, useTableSort } from "../tableState";
 import {
   reportFields,
   mergeReportFields,
@@ -427,6 +427,7 @@ export function RecordTable({
       },
     });
   const sorting = useTableSort(records, columns);
+  const pagination = useTablePagination(records.length);
   return (
     <Table
       rowKey="record_id"
@@ -434,7 +435,7 @@ export function RecordTable({
       columns={columns}
       tableLayout="auto"
       hover
-      pagination={{ total: records.length, defaultPageSize: 20, pageSizeOptions: [20, 50, 100] }}
+      pagination={pagination}
       empty={t("No records match this view.")}
     />
   );
@@ -621,9 +622,7 @@ export function RecordEditor({
               label={t("Asset type")}
               warning={attempted && invalid.type && t("Choose an asset type")}
             >
-              <Select
-                popupProps={{ trigger: "focus" }}
-                filterable
+              <FocusSelect
                 value={draft.asset_type_id}
                 options={metadata.asset_types.map((item) => ({
                   value: item.asset_type_id,
@@ -637,9 +636,7 @@ export function RecordEditor({
               label={t("Institution")}
               warning={attempted && invalid.institution && t("Choose an institution")}
             >
-              <Select
-                filterable
-                popupProps={{ trigger: "focus" }}
+              <FocusSelect
                 value={draft.institution_id}
                 options={metadata.institutions.map((item) => ({
                   value: item.institution_id,
@@ -653,9 +650,7 @@ export function RecordEditor({
               label={t("Currency")}
               warning={attempted && invalid.currency && t("Choose a currency")}
             >
-              <Select
-                filterable
-                popupProps={{ trigger: "focus" }}
+              <FocusSelect
                 value={draft.currency_id}
                 options={metadata.currencies.map((item) => ({
                   value: item.currency_id,

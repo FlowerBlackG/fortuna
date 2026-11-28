@@ -1,9 +1,22 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { useState } from "react";
-import { Alert, Button, Space } from "tdesign-react";
+import { Alert, Button, Popup, Space } from "tdesign-react";
 import { FolderOpenIcon, AddIcon } from "tdesign-icons-react";
 import { chooseDatabase, runtime, switchMode } from "../desktop";
 import { t } from "../i18n";
+
+export function DatabaseName() {
+  if (runtime?.mode !== "file") return null;
+  return (
+    <Popup
+      trigger="hover"
+      content={runtime.databasePath}
+      overlayInnerStyle={{ maxWidth: "min(560px, 90vw)", overflowWrap: "anywhere" }}
+    >
+      <strong>{runtime.databaseName}</strong>
+    </Popup>
+  );
+}
 
 export function DatabaseFiles({ showName = true }: { showName?: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -21,7 +34,7 @@ export function DatabaseFiles({ showName = true }: { showName?: boolean }) {
   }
   return (
     <Space direction="vertical">
-      {showName && runtime?.mode === "file" && <strong>{runtime.databaseName}</strong>}
+      {showName && runtime?.mode === "file" && <DatabaseName />}
       <span className="muted">{t("Sign in or create an account in the database you choose.")}</span>
       <Space breakLine>
         <Button

@@ -30,14 +30,22 @@ const tooltip = {
   className: "analysis-tooltip",
 };
 
-function tooltipCard(title: string, rows: [string, string][], total: string) {
+type TooltipRow = [name: string, value: string, color?: string];
+
+function tooltipCard(title: string, rows: TooltipRow[], total: string) {
   const card = document.createElement("div");
   const heading = document.createElement("strong");
   heading.textContent = title;
   card.append(heading);
-  for (const [name, value] of [...rows, [t("Total"), total]]) {
+  for (const [name, value, color] of rows.concat([[t("Total"), total]])) {
     const row = document.createElement("div");
-    row.textContent = `${name}: ${value}`;
+    if (color) {
+      const dot = document.createElement("span");
+      dot.className = "analysis-tooltip-dot";
+      dot.style.backgroundColor = color;
+      row.append(dot);
+    }
+    row.append(`${name}: ${value}`);
     card.append(row);
   }
   return card;
@@ -81,7 +89,7 @@ export function StackedChart({ points, groups, groupLabel, currencyName, money }
         if (center === -1) center = ordered.length - 1;
       }
       const start = Math.max(0, Math.min(center - 1, ordered.length - 3));
-      const neighbors = ordered.slice(start, start + 3);
+      const neighbors = ordered.slice(start, start + 3).reverse();
       const total = money(point.total);
       chart.dispatchAction({
         type: "showTip",
@@ -91,7 +99,11 @@ export function StackedChart({ points, groups, groupLabel, currencyName, money }
           formatter: () =>
             tooltipCard(
               point.title,
-              neighbors.map((group) => [group.name, money(point.values.get(group.id) ?? 0)]),
+              neighbors.map((group) => [
+                group.name,
+                money(point.values.get(group.id) ?? 0),
+                group.color,
+              ]),
               total,
             ),
         },

@@ -170,9 +170,9 @@ try {
   await expect(page.getByRole("row").filter({ hasText: "Server environment" })).toContainText(
     build.environment,
   );
-  await expect(
-    page.getByText(`${build.version} (${build.version_code})`, { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: "Server version" })).toContainText(
+    `${build.version} (${build.version_code})`,
+  );
   const appBuild = await page
     .getByRole("row")
     .filter({ hasText: "Web version" })
@@ -213,6 +213,7 @@ try {
   });
   await page.getByRole("button", { name: "Add currency", exact: true }).click();
   const dialog = page.locator(".t-dialog:visible");
+  const currencies = () => page.locator("tbody tr td:first-child").allTextContents();
   await formItem(dialog, /^Name$/)
     .locator("input")
     .fill("EUR");
@@ -233,7 +234,13 @@ try {
     .getByText("Metadata temporarily unavailable", { exact: true })
     .waitFor({ state: "hidden" });
   await expect(page.getByRole("button", { name: "Add currency", exact: true })).toBeEnabled();
-  const beforeEdit = metadataRequests;
+  // A subsequent entry makes an edit-to-end jump observable.
+  await api("POST", "/currencies", { name: "Added elsewhere" });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.getByRole("cell", { name: "Added elsewhere", exact: true }).waitFor();
+  const beforeSave = metadataRequests;
+  const beforeEditRows = await currencies();
+  assert.notEqual(beforeEditRows.at(-1), "EUR");
   await page
     .getByRole("row")
     .filter({ has: page.getByRole("cell", { name: "EUR", exact: true }) })
@@ -247,8 +254,11 @@ try {
     .getByRole("button", { name: "Save", exact: true })
     .click();
   await page.getByRole("cell", { name: "EUR edited", exact: true }).waitFor();
-  assert.equal(metadataRequests, beforeEdit);
-  await api("POST", "/currencies", { name: "Added elsewhere" });
+  assert.equal(metadataRequests, beforeSave);
+  assert.deepEqual(
+    await currencies(),
+    beforeEditRows.map((name) => (name === "EUR" ? "EUR edited" : name)),
+  );
   await page.getByText("Institutions", { exact: true }).first().click();
   await expect(page.getByRole("button", { name: "Add institution", exact: true })).toBeEnabled();
   const beforeReturn = metadataRequests;
@@ -257,10 +267,41 @@ try {
   await expect(page.getByRole("button", { name: "Add currency", exact: true })).toBeEnabled();
   assert.equal(metadataRequests, beforeReturn + 1);
   assert.equal(pings, initialPings);
+  const sortName = page.getByRole("columnheader", { name: "Name", exact: true });
+  await sortName.locator(".t-table-sort-asc").click();
+  await expect.poll(currencies).toEqual(["Added elsewhere", "CNY", "EUR edited", "USD"]);
+  await sortName.locator(".t-table-sort-desc").click();
+  await expect.poll(currencies).toEqual(["USD", "EUR edited", "CNY", "Added elsewhere"]);
+
+  for (let i = 0; i < 46; i++) await api("POST", "/currencies", { name: `Test currency ${i}` });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  const pageSize = page.locator(".t-pagination__select");
+  await expect(pageSize.locator("input")).toHaveValue("50 / page");
+  await expect(page.locator("tbody tr")).toHaveCount(50);
+  async function setPageSize(size) {
+    await pageSize.click();
+    await page
+      .locator(".t-select-option:visible")
+      .getByText(`${size} / page`, { exact: true })
+      .click();
+    await expect(pageSize.locator("input")).toHaveValue(`${size} / page`);
+  }
+  // Put newly added rows past the default first page under the active sort.
+  await sortName.locator(".t-table-sort-asc").click();
+  await setPageSize(100);
+  await page.getByRole("button", { name: "Add currency", exact: true }).click();
+  await formItem(dialog, /^Name$/).locator("input").fill("ZZZ last currency");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "ZZZ last currency", exact: true })).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(51);
+  await setPageSize(200);
 
   await page.getByText("Reports", { exact: true }).first().click();
   await page.getByRole("link", { name: "Snapshot 1", exact: true }).click();
   const rateSection = page.getByRole("region", { name: "Report exchange rates", exact: true });
+  await expect(rateSection.getByRole("cell", { name: "USD / CNY", exact: true })).toBeVisible();
+  await expect(rateSection.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+  await page.getByRole("switch", { name: "Editing" }).click();
   await rateSection.getByRole("button", { name: "Edit", exact: true }).click();
   const rateDialog = page.locator(".t-dialog:visible");
   const rateInput = formItem(rateDialog, /^Exchange rate$/).getByRole("textbox");
@@ -289,7 +330,7 @@ try {
   await rateInput.fill("6");
   await rateDialog.getByRole("button", { name: "Save", exact: true }).click();
   await rateDialog.waitFor({ state: "hidden" });
-  await page.getByRole("switch").click();
+  await page.getByRole("switch", { name: "Editing" }).click();
   await expect(
     rateSection.getByRole("button", { name: "Add exchange rate", exact: true }),
   ).toHaveCount(0);
@@ -306,7 +347,7 @@ try {
   ).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Reference", exact: true })).toHaveCount(1);
   await expect(page.getByRole("cell", { name: "2.5%", exact: true })).toBeVisible();
-  await page.getByRole("switch").click();
+  await page.getByRole("switch", { name: "Editing" }).click();
   await expect(page.locator(".chart canvas")).toHaveCount(2);
   await expect
     .poll(async () =>
@@ -391,11 +432,25 @@ try {
       ]);
     });
     await canvas.hover({ position: { x, y } });
-    await expect(page.locator("body > .analysis-tooltip:visible")).toContainText(
+    const tip = page.locator("body > .analysis-tooltip:visible");
+    await expect(tip.locator("strong ~ div")).toHaveText([
+      `${names[1]}: 30.00 CNY`,
       `${names[0]}: 36.00 CNY`,
-    );
-    await expect(page.locator("body > .analysis-tooltip:visible")).toContainText(
       "Total: 66.00 CNY",
+    ]);
+    assert.deepEqual(
+      await tip.locator(".analysis-tooltip-dot").evaluateAll((dots) =>
+        dots.map((dot) => dot.style.backgroundColor),
+      ),
+      await page.evaluate(
+        (colors) =>
+          colors.map((color) => {
+            const dot = document.createElement("span");
+            dot.style.backgroundColor = color;
+            return dot.style.backgroundColor;
+          }),
+        [stack.series[1].itemStyle.color, stack.series[0].itemStyle.color],
+      ),
     );
   }
   await page.getByText("Asset type", { exact: true }).click();
@@ -429,6 +484,7 @@ try {
       (await chartOptions())[0]?.series[0]?.data.map((item) => item.value).sort((a, b) => a - b),
     )
     .toEqual([5, 6]);
+  await page.getByRole("switch", { name: "Editing" }).click();
   await rateSection.getByRole("button", { name: "Delete exchange rate", exact: true }).click();
   await page.locator(".t-popconfirm").getByRole("button", { name: "OK", exact: true }).click();
   await expect(

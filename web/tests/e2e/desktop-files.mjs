@@ -55,11 +55,16 @@ try {
     await input.fill("local password");
   await click("Create account");
   await reports();
+  await page.getByText("Settings", { exact: true }).first().click();
+  await page.getByText("Local database", { exact: true }).click();
+  await page.locator("strong").getByText("household.sqlite3", { exact: true }).hover();
+  await expect(page.locator(".t-popup__content").getByText(database, { exact: true })).toBeVisible();
+  await page.getByText("Reports", { exact: true }).first().click();
   await click("Create report");
   const title = page.getByPlaceholder("Report title (optional)");
   await title.fill("Household savings");
   await title.press("Tab");
-  await page.getByRole("heading", { name: "Household savings" }).waitFor();
+  await page.getByText("Title saved", { exact: true }).waitFor();
   await click("Log out");
   await signIn();
   await page.getByRole("link", { name: "Household savings" }).waitFor();

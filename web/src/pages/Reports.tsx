@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { getLanguage, t } from "../i18n";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useNavigationType, useParams } from "react-router";
 import { v7 as uuidv7 } from "uuid";
 import {
   Alert,
@@ -34,7 +34,7 @@ import {
 } from "../components/Records";
 import { emptyFilters, filterRecords, useDefaultCurrency, usePrecision } from "../recordState";
 import type { RecordDraft, RecordStatus } from "../components/Records";
-import { useTableSort } from "../tableState";
+import { useTablePagination, useTableSort } from "../tableState";
 import type { ReportExport } from "../reportExport";
 import type { ServerInfo } from "../version";
 import { ReportExportDialog } from "../components/ReportExportDialog";
@@ -104,7 +104,7 @@ export function ReportsPage({ serverVersion }: { serverVersion: ServerInfo }) {
       const report = await request<Report>("POST", "/reports", {
         report_time: new Date().toISOString(),
       });
-      await navigate(`/reports/${report.report_id}`);
+      await navigate(`/reports/${report.report_id}`, { state: { newReport: true } });
     } finally {
       setCreating(false);
     }
@@ -201,6 +201,7 @@ export function ReportsPage({ serverVersion }: { serverVersion: ServerInfo }) {
       },
     });
   const sorting = useTableSort(rows, columns, { sortBy: "report_time", descending: true });
+  const pagination = useTablePagination(rows.length);
   return (
     <>
       <div className="page-heading">
@@ -236,7 +237,7 @@ export function ReportsPage({ serverVersion }: { serverVersion: ServerInfo }) {
           loading={state.loading}
           {...sorting}
           columns={columns}
-          pagination={{ total: rows.length, defaultPageSize: 20 }}
+          pagination={pagination}
           empty={t("No reports yet. Create one to start recording your assets.")}
         />
       </Card>
@@ -257,6 +258,8 @@ function ReportDetail({
   serverVersion: ServerInfo;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationType = useNavigationType();
   const { metadata, refresh: refreshMetadata, ensure } = useMetadata();
   const [records, setRecords] = useState<AssetRecord[]>([]);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
@@ -282,7 +285,9 @@ function ReportDetail({
     "Saving title…" | "Title saved" | "Title not saved — click Retry"
   >();
   const [editing, setEditing] = useState<AssetRecord | null | undefined>();
-  const [editable, setEditable] = useState(true);
+  const [editable, setEditable] = useState(
+    navigationType === "PUSH" && location.state?.newReport === true,
+  );
   const [statuses, setStatuses] = useState<Record<string, RecordStatus>>({});
   const [filters, setFilters] = useState(emptyFilters);
   const [currency, setCurrency] = useDefaultCurrency();
@@ -480,6 +485,8 @@ function ReportDetail({
         <Space>
           <span>{t("Editing")}</span>
           <Switch
+            aria-label={t("Editing")}
+            aria-checked={editable}
             value={editable}
             disabled={unsynced}
             onChange={(value) => setEditable(Boolean(value))}

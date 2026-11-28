@@ -27,6 +27,7 @@ import {
 import { ReportSankey, StackedChart } from "../components/AnalysisCharts";
 import { FilterControls, ValuationControls } from "../components/Records";
 import { emptyFilters, filterRecords, useDefaultCurrency, usePrecision } from "../recordState";
+import { useTablePagination } from "../tableState";
 import type { AssetRecord, Report } from "../types";
 
 function localDate(date: Date) {
@@ -90,6 +91,7 @@ export function AnalysisPage() {
     };
   });
   const missing = points.reduce((count, point) => count + point.missing, 0);
+  const pagination = useTablePagination(points.length);
   const groupLabel = t(grouping[groupBy]).toLowerCase();
   const ids = new Set(points.flatMap((p) => [...p.values.keys()]));
   const labels = new Map<string, { name: string; color?: string }>(
@@ -276,7 +278,7 @@ export function AnalysisPage() {
             },
           ]}
           empty={t("Choose reports to compare.")}
-          pagination={{ total: points.length, defaultPageSize: 20 }}
+          pagination={pagination}
         />
       </Card>
     </div>

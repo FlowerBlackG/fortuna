@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 import { useState } from "react";
-import type { PrimaryTableCol, TableRowData, TableSort } from "tdesign-react";
+import type { PaginationProps, PrimaryTableCol, TableRowData, TableSort } from "tdesign-react";
+
+const pageSizeOptions = [20, 50, 100, 200];
+
+export function useTablePagination(total: number): PaginationProps {
+  const [page, setPage] = useState({ current: 1, pageSize: 50 });
+  return {
+    current: Math.min(page.current, Math.max(1, Math.ceil(total / page.pageSize))),
+    pageSize: page.pageSize,
+    pageSizeOptions,
+    total,
+    onChange: ({ current, pageSize }) => setPage({ current, pageSize }),
+  };
+}
 
 export function useTableSort<T extends TableRowData>(
   data: T[],
