@@ -1,4 +1,8 @@
-# Fortuna Audit
+<p align="center">
+  <img src="web/src/assets/fortuna-logo.webp" width="80" alt="Logo" />
+</p>
+
+<h1 align="center">Fortuna Audit</h1>
 
 Fortuna Audit helps you track your savings and investments across accounts and currencies. Each report captures what you own on a given date, so you can see how your holdings change over time.
 
