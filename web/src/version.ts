@@ -11,11 +11,11 @@ export interface ServerInfo extends BuildInfo {
 }
 
 export default class Version {
-  static code = 1;
-  static tag = "1.0.0";
+  static code = 2;
+  static tag = "1.0.1";
 
   /** in iso8601 format */
-  static buildTime = "2026-11-22T20:50:36+08:00";
+  static buildTime = "2026-11-28T13:43:01+08:00";
 
   private constructor() {}
 }
